@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.thinkai4j</groupId>
+    <artifactId>think-ai4j</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>ThinkAi4j</name>
+    <description>Simple, powerful, out-of-the-box AI framework for Spring Boot 3</description>
+    <url>https://github.com/thinkai4j/think-ai4j</url>
+
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>ThinkAi4j Team</name>
+        </developer>
+    </developers>
+
+    <modules>
+        <module>think-ai4j-core</module>
+        <module>think-ai4j-provider-openai-compat</module>
+        <module>think-ai4j-memory</module>
+        <module>think-ai4j-memory-redis</module>
+        <module>think-ai4j-tool</module>
+        <module>think-ai4j-rag</module>
+        <module>think-ai4j-agent</module>
+        <module>think-ai4j-observability</module>
+        <module>think-ai4j-store-pgvector</module>
+        <module>think-ai4j-spring-boot-starter</module>
+        <module>think-ai4j-example</module>
+        <module>think-ai4j-test</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <okhttp.version>4.12.0</okhttp.version>
+        <jackson.version>2.17.0</jackson.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.thinkai4j</groupId>
+                <artifactId>think-ai4j-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thinkai4j</groupId>
+                <artifactId>think-ai4j-provider-openai-compat</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thinkai4j</groupId>
+                <artifactId>think-ai4j-spring-boot-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thinkai4j</groupId>
+                <artifactId>think-ai4j-memory</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thinkai4j</groupId>
+                <artifactId>think-ai4j-tool</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thinkai4j</groupId>
+                <artifactId>think-ai4j-rag</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thinkai4j</groupId>
+                <artifactId>think-ai4j-agent</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thinkai4j</groupId>
+                <artifactId>think-ai4j-memory-redis</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thinkai4j</groupId>
+                 <artifactId>think-ai4j-observability</artifactId>
+                 <version>${project.version}</version>
+             </dependency>
+             <dependency>
+                 <groupId>com.thinkai4j</groupId>
+                 <artifactId>think-ai4j-store-pgvector</artifactId>
+                 <version>${project.version}</version>
+             </dependency>
+             <dependency>
+                 <groupId>com.thinkai4j</groupId>
+                 <artifactId>think-ai4j-test</artifactId>
+                 <version>${project.version}</version>
+                 <scope>test</scope>
+             </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

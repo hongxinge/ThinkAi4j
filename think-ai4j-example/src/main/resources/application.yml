@@ -1,0 +1,84 @@
+# =====================================================
+# ThinkAi4j 示例项目配置文件
+# =====================================================
+
+think:
+  ai:
+    # 默认提供商
+    default-provider: doubao
+
+    # OpenAI 兼容模型配置（所有符合OpenAI API规范的模型）
+    compat:
+      providers:
+        # 豆包 (字节跳动)
+        - name: doubao
+          baseUrl: https://ark.cn-beijing.volces.com/api/v3
+          apiKey: your-api-key-here
+          model: ep-20250101123456-xxxxx
+
+        # Kimi (月之暗面)
+        # - name: moonshot
+        #   baseUrl: https://api.moonshot.cn/v1
+        #   apiKey: your-moonshot-key
+        #   model: moonshot-v1-8k
+
+        # 智谱 GLM
+        # - name: glm
+        #   baseUrl: https://open.bigmodel.cn/api/paas/v4
+        #   apiKey: your-zhipu-key
+        #   model: glm-4
+
+        # 通义千问 (阿里)
+        # - name: qwen
+        #   baseUrl: https://dashscope.aliyuncs.com/compatible-mode/v1
+        #   apiKey: your-aliyun-key
+        #   model: qwen-turbo
+
+        # DeepSeek
+        # - name: deepseek
+        #   baseUrl: https://api.deepseek.com
+        #   apiKey: your-deepseek-key
+        #   model: deepseek-chat
+
+        # 腾讯混元
+        # - name: hunyuan
+        #   baseUrl: https://api.hunyuan.cloud.tencent.com/v1
+        #   apiKey: your-tencent-key
+        #   model: hunyuan-turbo
+
+        # MiniMax
+        # - name: minimax
+        #   baseUrl: https://api.minimax.chat/v1
+        #   apiKey: your-minimax-key
+        #   model: MiniMax-Text-01
+
+        # 百度文心
+        # - name: qianfan
+        #   baseUrl: https://qianfan.baidubce.com/v2
+        #   apiKey: your-baidu-key
+        #   model: ernie-4.0-8k
+
+        # Ollama 本地部署
+        # - name: ollama
+        #   baseUrl: http://localhost:11434
+        #   model: qwen2.5:7b
+
+      # HTTP 客户端配置
+      httpClient:
+        connectionPool:
+          max-idle-connections: 50
+          keep-alive-minutes: 5
+        timeout:
+          connect-seconds: 30
+          read-seconds: 60
+          write-seconds: 30
+
+    # 记忆配置
+    memory:
+      type: memory      # memory=内存 | redis=持久化
+      max-messages: 20
+      ttl-minutes: 60   # Redis 过期时间
+
+# 服务器配置
+server:
+  port: 8080
