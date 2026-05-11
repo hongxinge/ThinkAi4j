@@ -48,9 +48,29 @@ ThinkAi4j 采用**通用兼容 + 特殊适配**的设计：
 
 ## 快速开始
 
-### 1. 添加依赖
+### 第 1 步：克隆仓库
+
+```bash
+git clone https://gitee.com/hongxinge/think-ai4j.git
+cd think-ai4j
+```
+
+### 第 2 步：本地安装
+
+```bash
+# Windows (PowerShell)
+$env:JAVA_HOME="你的JDK路径"
+mvn clean install -DskipTests
+```
+
+安装后，所有模块即可在本地 Maven 仓库中使用。
+
+### 第 3 步：在项目中引入
+
+在你的 Spring Boot 项目 `pom.xml` 中添加：
 
 ```xml
+<!-- Spring Boot Starter（自动装配） -->
 <dependency>
     <groupId>com.thinkai4j</groupId>
     <artifactId>think-ai4j-spring-boot-starter</artifactId>
@@ -58,13 +78,9 @@ ThinkAi4j 采用**通用兼容 + 特殊适配**的设计：
 </dependency>
 ```
 
-### 2. 配置模型
+> 框架已内置 Spring Boot Starter，引入后自动生效，无需额外配置。
 
-**方案 A：Ollama 本地（零配置）**
-
-只要本地安装了 Ollama，无需任何配置。
-
-**方案 B：单个模型（1 行配置）**
+### 第 4 步：配置模型
 
 ```yaml
 think:
@@ -74,57 +90,19 @@ think:
       providers:
         - name: doubao
           baseUrl: https://ark.cn-beijing.volces.com/api/v3
-          apiKey: ${DOUBAO_KEY}
-          model: ep-20250101123456-xxxxx
-```
+          apiKey: 你的API密钥
+          model: 你的模型ID
 
-**方案 C：同时配置多个模型**
+        # 可同时配置多个模型
+        # - name: moonshot
+        #   baseUrl: https://api.moonshot.cn/v1
+        #   apiKey: 你的API密钥
+        #   model: moonshot-v1-8k
 
-```yaml
-think:
-  ai:
-    default-provider: doubao
-    compat:
-      providers:
-        - name: doubao
-          baseUrl: https://ark.cn-beijing.volces.com/api/v3
-          apiKey: ${DOUBAO_KEY}
-          model: ep-xxxxx
-
-        - name: moonshot
-          baseUrl: https://api.moonshot.cn/v1
-          apiKey: ${MOONSHOT_KEY}
-          model: moonshot-v1-8k
-
-        - name: glm
-          baseUrl: https://open.bigmodel.cn/api/paas/v4
-          apiKey: ${ZHIPU_KEY}
-          model: glm-4
-
-        - name: qwen
-          baseUrl: https://dashscope.aliyuncs.com/compatible-mode/v1
-          apiKey: ${ALIYUN_KEY}
-          model: qwen-turbo
-
-        - name: deepseek
-          baseUrl: https://api.deepseek.com
-          apiKey: ${DEEPSEEK_KEY}
-          model: deepseek-chat
-
-        - name: hunyuan
-          baseUrl: https://api.hunyuan.cloud.tencent.com/v1
-          apiKey: ${TENCENT_KEY}
-          model: hunyuan-turbo
-
-        - name: minimax
-          baseUrl: https://api.minimax.chat/v1
-          apiKey: ${MINIMAX_KEY}
-          model: MiniMax-Text-01
-
-        - name: qianfan
-          baseUrl: https://qianfan.baidubce.com/v2
-          apiKey: ${BAIDU_KEY}
-          model: ernie-4.0-8k
+        # - name: glm
+        #   baseUrl: https://open.bigmodel.cn/api/paas/v4
+        #   apiKey: 你的API密钥
+        #   model: glm-4
 
       httpClient:
         connectionPool:
@@ -138,10 +116,11 @@ think:
     memory:
       type: memory      # memory=内存 | redis=持久化
       max-messages: 20
-      ttl-minutes: 60   # Redis 过期时间
 ```
 
-### 3. 开始使用
+> **Ollama 本地模型零配置**：只要本地安装了 Ollama（默认端口 11434），无需任何配置即可使用。
+
+### 第 5 步：开始使用
 
 #### 简单对话
 
