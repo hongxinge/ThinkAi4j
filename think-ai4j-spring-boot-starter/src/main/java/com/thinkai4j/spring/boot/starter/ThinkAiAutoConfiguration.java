@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.List;
+import java.util.Optional;
 
 @Configuration
 @EnableConfigurationProperties(ThinkAiProperties.class)
@@ -60,8 +61,8 @@ public class ThinkAiAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(AiChat.class)
-    public AiChat aiChat(ChatProviderRegistry registry, ChatMemory chatMemory) {
-        return new DefaultAiChat(registry, chatMemory);
+    public AiChat aiChat(ChatProviderRegistry registry, Optional<ChatMemory> chatMemory) {
+        return new DefaultAiChat(registry, chatMemory.orElse(null));
     }
 
     @Configuration

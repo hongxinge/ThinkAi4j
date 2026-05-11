@@ -28,10 +28,10 @@ public class Agent {
     }
 
     public String execute(String task) {
-        String input = systemPrompt != null && !systemPrompt.isEmpty()
-                ? systemPrompt + "\n\n用户任务：" + task
-                : task;
-        return chat.system(systemPrompt).ask(input);
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            return chat.system(systemPrompt).ask(task);
+        }
+        return chat.ask(task);
     }
 
     public ToolExecutor getToolExecutor() {

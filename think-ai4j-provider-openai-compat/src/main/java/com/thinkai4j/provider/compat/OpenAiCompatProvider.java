@@ -127,13 +127,18 @@ public class OpenAiCompatProvider implements ChatProvider {
                                 }
                             }
                         } catch (Exception e) {
+                            log.error("Failed to parse SSE event from provider {}: {}", providerName, e.getMessage());
                             sink.error(new AiException(providerName, "PARSE_ERROR", "Failed to parse SSE event", e));
                         }
                     }
 
                     @Override
                     public void onFailure(@NotNull EventSource eventSource, Throwable t, Response response) {
-                        sink.error(new AiException(providerName, "STREAM_ERROR", "Stream failed", t));
+                        String errorMsg = (response != null) 
+                                ? "HTTP " + response.code() + ": " + response.message() 
+                                : t.getMessage();
+                        log.error("Stream failed for provider {}: {}", providerName, errorMsg, t);
+                        sink.error(new AiException(providerName, "STREAM_ERROR", "Stream failed: " + errorMsg, t));
                     }
 
                     @Override
@@ -145,6 +150,7 @@ public class OpenAiCompatProvider implements ChatProvider {
                 EventSources.createFactory(httpClient).newEventSource(httpRequest, listener);
 
             } catch (Exception e) {
+                log.error("Failed to setup stream for provider {}: {}", providerName, e.getMessage(), e);
                 sink.error(new AiException(providerName, "SETUP_ERROR", "Failed to setup stream", e));
             }
         });
@@ -232,7 +238,10 @@ public class OpenAiCompatProvider implements ChatProvider {
         if (choices != null && choices.isArray() && choices.size() > 0) {
             JsonNode message = choices.get(0).get("message");
             if (message != null) {
-                response.setContent(message.get("content").asText());
+                JsonNode contentNode = message.get("content");
+                if (contentNode != null && !contentNode.isNull()) {
+                    response.setContent(contentNode.asText());
+                }
 
                 if (message.has("tool_calls") && message.get("tool_calls").isArray()) {
                     List<ToolCall> toolCalls = new ArrayList<>();
@@ -242,8 +251,10 @@ public class OpenAiCompatProvider implements ChatProvider {
                         toolCall.setType(tc.get("type").asText());
                         ToolCall.FunctionCall function = new ToolCall.FunctionCall();
                         JsonNode funcNode = tc.get("function");
-                        function.setName(funcNode.get("name").asText());
-                        function.setArguments(funcNode.get("arguments").asText());
+                        if (funcNode != null) {
+                            function.setName(funcNode.get("name").asText());
+                            function.setArguments(funcNode.get("arguments").asText());
+                        }
                         toolCall.setFunction(function);
                         toolCalls.add(toolCall);
                     }
