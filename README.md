@@ -4,6 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 - **Java**: 17+
+- **Maven**: 3.6.3+
 - **Spring Boot**: 3.2+
 - **Gitee**: [https://gitee.com/hongxinge/think-ai4j](https://gitee.com/hongxinge/think-ai4j)
 
@@ -56,6 +57,8 @@ cd think-ai4j
 ```
 
 ### 第 2 步：本地安装
+
+> **环境要求**：Java 17+、Maven 3.6.3+
 
 ```bash
 # Windows (PowerShell)
@@ -240,6 +243,8 @@ think-ai4j/
 ```
 
 ## 构建
+
+> **环境要求**：Java 17+、Maven 3.6.3+、Spring Boot 3.2+
 
 ```bash
 set JAVA_HOME=D:\JavaSdk\sdk-17
