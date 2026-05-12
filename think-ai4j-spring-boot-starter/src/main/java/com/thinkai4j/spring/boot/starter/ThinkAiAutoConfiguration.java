@@ -12,6 +12,8 @@ import com.thinkai4j.provider.compat.OpenAiCompatProvider;
 import com.thinkai4j.rag.DocumentStore;
 import com.thinkai4j.rag.InMemoryDocumentStore;
 import com.thinkai4j.rag.RagPipeline;
+import com.thinkai4j.agent.Agent;
+import com.thinkai4j.tool.annotation.AiTool;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,7 +22,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Configuration
@@ -120,6 +124,45 @@ public class ThinkAiAutoConfiguration {
         @ConditionalOnMissingBean(RagPipeline.class)
         public RagPipeline ragPipeline(AiChat chat, DocumentStore documentStore) {
             return new RagPipeline(chat, documentStore);
+        }
+    }
+
+    @Configuration
+    @ConditionalOnClass(Agent.class)
+    static class AgentAutoConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean(Agent.class)
+        public Agent defaultAgent(AiChat chat) {
+            return new Agent("default", "你是一个智能助手，能够使用各种工具完成任务", chat);
+        }
+    }
+
+    @Configuration
+    @ConditionalOnClass(AiTool.class)
+    static class ToolAutoConfiguration {
+
+        @Bean
+        public ToolRegistrar toolRegistrar() {
+            return new ToolRegistrar();
+        }
+    }
+
+    public static class ToolRegistrar {
+        public void registerToolBeans(Agent agent, Map<String, Object> beans) {
+            for (Object bean : beans.values()) {
+                registerToolBeans(agent, bean);
+            }
+        }
+
+        public void registerToolBeans(Agent agent, Object bean) {
+            Method[] methods = bean.getClass().getDeclaredMethods();
+            for (Method method : methods) {
+                if (method.getAnnotation(AiTool.class) != null) {
+                    agent.getToolExecutor().register(bean);
+                    break;
+                }
+            }
         }
     }
 }

@@ -7,6 +7,7 @@
 - **Maven**: 3.6.3+
 - **Spring Boot**: 3.2+
 - **Gitee**: [https://gitee.com/hongxinge/think-ai4j](https://gitee.com/hongxinge/think-ai4j)
+- **GitHub**: [https://github.com/hongxinge/ThinkAi4j](https://github.com/hongxinge/ThinkAi4j)
 
 ## 特性
 

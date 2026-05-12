@@ -1,6 +1,7 @@
 package com.thinkai4j.core.api;
 
 import com.thinkai4j.core.model.AiResponse;
+import com.thinkai4j.core.model.ChatRequest;
 import reactor.core.publisher.Flux;
 
 public interface AiChat {
@@ -20,4 +21,6 @@ public interface AiChat {
     Flux<String> stream(String question);
 
     AiResponse chatWithTools(String question);
+
+    AiResponse chat(ChatRequest request);
 }

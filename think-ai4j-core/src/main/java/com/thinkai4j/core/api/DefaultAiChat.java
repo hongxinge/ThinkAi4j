@@ -88,6 +88,14 @@ public class DefaultAiChat implements AiChat {
         return chatWithTools(question, null);
     }
 
+    @Override
+    public AiResponse chat(ChatRequest request) {
+        if (request.getModel() == null || request.getModel().isEmpty()) {
+            request.setModel(getProviderName());
+        }
+        return getProvider().chat(request);
+    }
+
     public DefaultAiChat registerTool(ToolDefinition definition, Function<String, String> executor) {
         if (this.toolDefinitions == null) {
             this.toolDefinitions = new ArrayList<>();

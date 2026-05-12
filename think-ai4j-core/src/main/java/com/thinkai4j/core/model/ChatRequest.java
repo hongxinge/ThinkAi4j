@@ -115,6 +115,11 @@ public class ChatRequest {
             return this;
         }
 
+        public Builder tools(List<ToolDefinition> tools) {
+            request.setTools(tools);
+            return this;
+        }
+
         public ChatRequest build() {
             return request;
         }

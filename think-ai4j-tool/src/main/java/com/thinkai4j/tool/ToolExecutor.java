@@ -70,13 +70,16 @@ public class ToolExecutor {
         }
 
         try {
-            JsonNode argsNode = objectMapper.readTree(argumentsJson);
+            JsonNode argsNode = objectMapper.readTree(argumentsJson != null ? argumentsJson : "{}");
             Parameter[] parameters = instance.method.getParameters();
             Object[] args = new Object[parameters.length];
 
             for (int i = 0; i < parameters.length; i++) {
                 String paramName = parameters[i].getName();
                 JsonNode valueNode = argsNode.get(paramName);
+                if (valueNode == null) {
+                    valueNode = argsNode.get("arg" + i);
+                }
                 args[i] = convertValue(valueNode, parameters[i].getType());
             }
 
