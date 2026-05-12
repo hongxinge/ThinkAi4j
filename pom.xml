@@ -39,6 +39,7 @@
         <module>think-ai4j-memory</module>
         <module>think-ai4j-memory-redis</module>
         <module>think-ai4j-tool</module>
+        <module>think-ai4j-skill</module>
         <module>think-ai4j-rag</module>
         <module>think-ai4j-agent</module>
         <module>think-ai4j-observability</module>

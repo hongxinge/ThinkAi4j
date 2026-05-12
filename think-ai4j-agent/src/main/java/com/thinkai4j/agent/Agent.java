@@ -36,6 +36,7 @@ public class Agent {
     private final ToolExecutor toolExecutor;
     private ChatMemory memory;
     private String conversationId;
+    private AgentLongTermMemory longTermMemory;
     private final List<AiMessage> messages = new CopyOnWriteArrayList<>();
     private int maxIterations = 10;
 
@@ -54,6 +55,11 @@ public class Agent {
     public Agent memory(ChatMemory memory, String conversationId) {
         this.memory = memory;
         this.conversationId = conversationId;
+        return this;
+    }
+
+    public Agent longTermMemory(AgentLongTermMemory longTermMemory) {
+        this.longTermMemory = longTermMemory;
         return this;
     }
 
@@ -92,8 +98,17 @@ public class Agent {
                     
                     String result = executeToolSafely(toolCall);
                     history.add(createToolResultMessage(toolCall, result));
+                    
+                    if (longTermMemory != null && toolName.contains("remember") || toolName.contains("save")) {
+                        longTermMemory.rememberFact(result);
+                    }
                 }
                 continue;
+            }
+
+            if (longTermMemory != null) {
+                longTermMemory.addShortTermMessage(AiMessage.user(task));
+                longTermMemory.addShortTermMessage(AiMessage.assistant(response.getContent()));
             }
 
             saveToMemory(history, task);
@@ -111,7 +126,14 @@ public class Agent {
             history.add(AiMessage.system(systemPrompt));
         }
 
-        if (conversationId != null && memory != null) {
+        if (longTermMemory != null) {
+            String context = longTermMemory.getSystemContext();
+            if (!context.isEmpty()) {
+                history.add(AiMessage.system(context));
+            }
+            List<AiMessage> shortTermHistory = longTermMemory.getShortTermHistory();
+            history.addAll(shortTermHistory);
+        } else if (conversationId != null && memory != null) {
             List<AiMessage> memMessages = memory.getMessages(conversationId);
             if (!memMessages.isEmpty()) {
                 history.addAll(memMessages);
