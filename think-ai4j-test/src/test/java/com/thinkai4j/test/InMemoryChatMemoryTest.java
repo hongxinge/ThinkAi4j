@@ -1,7 +1,8 @@
 package com.thinkai4j.test;
 
-import com.thinkai4j.core.model.AiMessage;
 import com.thinkai4j.memory.InMemoryChatMemory;
+import com.thinkai4j.core.model.AiMessage;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -10,53 +11,67 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class InMemoryChatMemoryTest {
 
+    private InMemoryChatMemory memory;
+
+    @BeforeEach
+    void setUp() {
+        memory = new InMemoryChatMemory();
+    }
+
     @Test
     void testAddAndGetMessages() {
-        InMemoryChatMemory memory = new InMemoryChatMemory();
         memory.addMessage("user-1", AiMessage.user("Hello"));
-        memory.addMessage("user-1", AiMessage.assistant("Hi!"));
+        memory.addMessage("user-1", AiMessage.assistant("Hi"));
 
         List<AiMessage> messages = memory.getMessages("user-1");
         assertEquals(2, messages.size());
-        assertEquals("Hello", messages.get(0).getContent());
-        assertEquals("Hi!", messages.get(1).getContent());
     }
 
     @Test
-    void testMaxMessagesLimit() {
-        InMemoryChatMemory memory = new InMemoryChatMemory();
-        memory.setMaxMessages(3);
-
+    void testMaxMessagesTruncation() {
+        memory.setMaxMessages(2);
         memory.addMessage("user-1", AiMessage.user("1"));
-        memory.addMessage("user-1", AiMessage.assistant("2"));
+        memory.addMessage("user-1", AiMessage.user("2"));
         memory.addMessage("user-1", AiMessage.user("3"));
-        memory.addMessage("user-1", AiMessage.assistant("4"));
 
         List<AiMessage> messages = memory.getMessages("user-1");
-        assertEquals(3, messages.size());
+        assertEquals(2, messages.size());
         assertEquals("2", messages.get(0).getContent());
         assertEquals("3", messages.get(1).getContent());
-        assertEquals("4", messages.get(2).getContent());
     }
 
     @Test
-    void testClear() {
-        InMemoryChatMemory memory = new InMemoryChatMemory();
+    void testClearMessages() {
         memory.addMessage("user-1", AiMessage.user("Hello"));
         memory.clear("user-1");
 
-        assertTrue(memory.getMessages("user-1").isEmpty());
+        List<AiMessage> messages = memory.getMessages("user-1");
+        assertTrue(messages.isEmpty());
     }
 
     @Test
-    void testSeparateConversations() {
-        InMemoryChatMemory memory = new InMemoryChatMemory();
-        memory.addMessage("user-1", AiMessage.user("User 1 msg"));
-        memory.addMessage("user-2", AiMessage.user("User 2 msg"));
+    void testMultipleConversationIdsAreIsolated() {
+        memory.addMessage("user-1", AiMessage.user("Hello from user-1"));
+        memory.addMessage("user-2", AiMessage.user("Hello from user-2"));
 
         assertEquals(1, memory.getMessages("user-1").size());
         assertEquals(1, memory.getMessages("user-2").size());
-        assertEquals("User 1 msg", memory.getMessages("user-1").get(0).getContent());
-        assertEquals("User 2 msg", memory.getMessages("user-2").get(0).getContent());
+        assertEquals("Hello from user-1", memory.getMessages("user-1").get(0).getContent());
+        assertEquals("Hello from user-2", memory.getMessages("user-2").get(0).getContent());
+    }
+
+    @Test
+    void testGetMessagesReturnsImmutableList() {
+        memory.addMessage("user-1", AiMessage.user("Hello"));
+        List<AiMessage> messages = memory.getMessages("user-1");
+
+        assertThrows(UnsupportedOperationException.class, () -> messages.add(AiMessage.user("new")));
+    }
+
+    @Test
+    void testGetMessagesForUnknownIdReturnsEmpty() {
+        List<AiMessage> messages = memory.getMessages("non-existent");
+        assertNotNull(messages);
+        assertTrue(messages.isEmpty());
     }
 }

@@ -214,8 +214,9 @@ public class OpenAiCompatProvider implements ChatProvider {
     }
 
     private Request buildRequest(String body) {
+        String url = baseUrl.endsWith("/") ? baseUrl + "chat/completions" : baseUrl + "/chat/completions";
         Request.Builder builder = new Request.Builder()
-                .url(baseUrl + "/chat/completions")
+                .url(url)
                 .header("Content-Type", "application/json")
                 .post(RequestBody.create(body, JSON));
 

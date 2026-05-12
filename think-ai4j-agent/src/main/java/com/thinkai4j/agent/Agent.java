@@ -146,9 +146,28 @@ public class Agent {
 
     private void saveToMemory(List<AiMessage> history, String task) {
         if (conversationId != null && memory != null) {
+            int existingMsgCount = getExistingMessageCount(memory, conversationId);
+            int msgStart = findNewMessageStartIndex(history);
             memory.addMessage(conversationId, AiMessage.user(task));
-            memory.addMessage(conversationId, history.get(history.size() - 1));
+            for (int i = msgStart; i < history.size(); i++) {
+                memory.addMessage(conversationId, history.get(i));
+            }
         }
+    }
+
+    private int getExistingMessageCount(ChatMemory mem, String convId) {
+        return mem.getMessages(convId).size();
+    }
+
+    private int findNewMessageStartIndex(List<AiMessage> history) {
+        int idx = 0;
+        for (; idx < history.size(); idx++) {
+            AiMessage msg = history.get(idx);
+            if (msg.getRole() != MessageType.SYSTEM) {
+                break;
+            }
+        }
+        return idx;
     }
 
     public ToolExecutor getToolExecutor() {

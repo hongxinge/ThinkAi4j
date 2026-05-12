@@ -10,6 +10,15 @@ public class InMemoryDocumentStore implements DocumentStore {
     private final Map<String, double[]> vectorCache = new ConcurrentHashMap<>();
     private int vectorSize = 0;
     private final Set<String> vocabulary = ConcurrentHashMap.newKeySet();
+    private final Tokenizer tokenizer;
+
+    public InMemoryDocumentStore() {
+        this(new ChineseTokenizer());
+    }
+
+    public InMemoryDocumentStore(Tokenizer tokenizer) {
+        this.tokenizer = tokenizer;
+    }
 
     @Override
     public void addDocuments(List<Document> documents) {
@@ -57,7 +66,7 @@ public class InMemoryDocumentStore implements DocumentStore {
     private void rebuildVectors() {
         Set<String> newVocab = new HashSet<>();
         for (Document doc : documents) {
-            tokenize(doc.getContent()).forEach(newVocab::add);
+            tokenizer.tokenize(doc.getContent()).forEach(newVocab::add);
         }
 
         if (!newVocab.equals(vocabulary)) {
@@ -97,7 +106,7 @@ public class InMemoryDocumentStore implements DocumentStore {
         double[] vector = new double[vectorSize];
         Map<String, Integer> termFreq = new HashMap<>();
 
-        for (String word : tokenize(text)) {
+        for (String word : tokenizer.tokenize(text)) {
             termFreq.merge(word, 1, Integer::sum);
         }
 
@@ -109,17 +118,6 @@ public class InMemoryDocumentStore implements DocumentStore {
         }
 
         return normalize(vector);
-    }
-
-    private List<String> tokenize(String text) {
-        List<String> tokens = new ArrayList<>();
-        String[] words = text.toLowerCase().split("\\s+|[^\\w]+");
-        for (String word : words) {
-            if (word.length() > 1) {
-                tokens.add(word);
-            }
-        }
-        return tokens;
     }
 
     private double[] normalize(double[] vector) {
