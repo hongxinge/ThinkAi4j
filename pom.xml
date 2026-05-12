@@ -97,6 +97,11 @@
             </dependency>
             <dependency>
                 <groupId>com.thinkai4j</groupId>
+                <artifactId>think-ai4j-skill</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thinkai4j</groupId>
                 <artifactId>think-ai4j-memory-redis</artifactId>
                 <version>${project.version}</version>
             </dependency>

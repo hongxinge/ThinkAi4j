@@ -18,7 +18,8 @@
 - **对话记忆** - 内置内存记忆，支持 Redis 持久化
 - **工具调用** - @AiTool 注解即可让 AI 调用你的方法
 - **RAG 增强** - 文档问答、知识库检索增强生成
-- **Agent 框架** - 智能代理，自动调用工具完成任务
+- **Agent 框架** - 智能代理，支持多轮工具调用、长期记忆、多Agent协作
+- **内置 Skill** - 文件操作、HTTP请求、数据库查询、时间日期、记忆管理等5大Skill
 - **OpenAI 标准** - 完全兼容 OpenAI API 规范
 - **MIT 协议** - 完全免费，可自由商用
 
@@ -215,6 +216,125 @@ Agent agent = new Agent("助手", "你是一个专业的助手", chat)
 String result = agent.execute("北京天气如何？");
 ```
 
+#### Agent 长期记忆
+
+```java
+ChatMemory memory = new InMemoryChatMemory();
+AgentLongTermMemory longTermMemory = new AgentLongTermMemory("assistant-1", memory);
+
+// 记住关键信息
+longTermMemory.rememberFact("用户姓名：张三");
+longTermMemory.rememberFact("用户偏好：Java开发");
+
+Agent agent = new Agent("助手", "你是专业助手", chat)
+    .longTermMemory(longTermMemory);
+```
+
+#### 多Agent协作
+
+```java
+AgentBus bus = new AgentBus();
+bus.register("研究员", researcherAgent);
+bus.register("写手", writerAgent);
+bus.register("审核员", reviewerAgent);
+
+// 链式执行：研究员->写手->审核员
+String report = bus.chainExecute(
+    List.of("研究员", "写手", "审核员"),
+    "研究AI趋势并写报告"
+);
+
+// 并行执行
+String results = bus.parallelExecute(Map.of(
+    "研究员", "研究技术趋势",
+    "写手", "写文章摘要"
+));
+```
+
+#### 内置 Skill - 文件操作
+
+```java
+FileSkill fileSkill = new FileSkill("/workspace");
+
+// 读写文件
+fileSkill.writeFile("notes.txt", "重要笔记");
+String content = fileSkill.readFile("notes.txt");
+
+// 列出目录
+String dirList = fileSkill.listDirectory("");
+```
+
+#### 内置 Skill - HTTP 请求
+
+```java
+HttpSkill httpSkill = new HttpSkill()
+    .setDefaultHeader("Authorization", "Bearer token");
+
+// GET 请求
+String response = httpSkill.httpGet("https://api.example.com/data", null);
+
+// POST 请求
+String postResult = httpSkill.httpPost(
+    "https://api.example.com/submit",
+    null,
+    "{\"key\": \"value\"}"
+);
+```
+
+#### 内置 Skill - 数据库查询
+
+```java
+// 使用 H2 内存数据库示例
+DatabaseSkill dbSkill = new DatabaseSkill(
+    "jdbc:h2:mem:testdb", "sa", ""
+);
+
+// SQL 查询
+String results = dbSkill.executeQuery("SELECT * FROM users");
+
+// 获取表列表
+String tables = dbSkill.listTables();
+
+// 查看表结构
+String schema = dbSkill.describeTable("users");
+```
+
+#### 内置 Skill - 时间日期
+
+```java
+TimeSkill timeSkill = new TimeSkill();
+
+// 获取当前时间
+String now = timeSkill.getCurrentDateTime("Asia/Shanghai");
+String date = timeSkill.getCurrentDate();
+String time = timeSkill.getCurrentTime();
+
+// 格式化时间戳
+String formatted = timeSkill.formatTimestamp(1700000000, "yyyy-MM-dd HH:mm:ss");
+```
+
+#### 内置 Skill - 记忆管理
+
+```java
+MemorySkill memorySkill = new MemorySkill();
+
+// 记住信息
+memorySkill.remember("用户名", "张三");
+memorySkill.remember("年龄", "25");
+
+// 查询记忆
+String name = memorySkill.recall("用户名");
+
+// 查询所有记忆
+String allMemories = memorySkill.recall(null);
+
+// 忘记信息
+memorySkill.forget("年龄");
+
+// 清空记忆
+memorySkill.clearMemory();
+```
+
 ## API 文档
 
 | 方法 | 说明 | 示例 |
@@ -234,13 +354,14 @@ think-ai4j/
 ├── think-ai4j-memory/                  # 内存记忆
 ├── think-ai4j-memory-redis/            # Redis 持久化记忆
 ├── think-ai4j-tool/                    # 工具调用
+├── think-ai4j-skill/                   # 内置Skill（文件、HTTP、数据库、时间、记忆）
 ├── think-ai4j-rag/                     # RAG 检索增强
-├── think-ai4j-agent/                   # Agent 框架
+├── think-ai4j-agent/                   # Agent 框架（支持长期记忆、多Agent协作）
 ├── think-ai4j-observability/           # 可观测性/指标采集
 ├── think-ai4j-store-pgvector/          # PgVector 向量存储
 ├── think-ai4j-spring-boot-starter/     # Spring Boot 自动配置
 ├── think-ai4j-example/                 # 示例项目
-└── think-ai4j-test/                    # 测试模块
+└── think-ai4j-test/                    # 测试模块（147个测试用例）
 ```
 
 ## 构建

@@ -34,6 +34,18 @@
             <artifactId>think-ai4j-rag</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.thinkai4j</groupId>
+            <artifactId>think-ai4j-agent</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.thinkai4j</groupId>
+            <artifactId>think-ai4j-skill</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.thinkai4j</groupId>
+            <artifactId>think-ai4j-provider-openai-compat</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-core</artifactId>
             <scope>test</scope>
@@ -41,6 +53,16 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
