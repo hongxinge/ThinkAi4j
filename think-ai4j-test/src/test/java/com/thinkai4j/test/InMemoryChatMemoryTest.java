@@ -61,11 +61,15 @@ class InMemoryChatMemoryTest {
     }
 
     @Test
-    void testGetMessagesReturnsImmutableList() {
+    void testGetMessagesReturnsDefensiveCopy() {
         memory.addMessage("user-1", AiMessage.user("Hello"));
         List<AiMessage> messages = memory.getMessages("user-1");
-
-        assertThrows(UnsupportedOperationException.class, () -> messages.add(AiMessage.user("new")));
+        assertEquals(1, messages.size());
+        
+        messages.add(AiMessage.user("new"));
+        
+        List<AiMessage> originalMessages = memory.getMessages("user-1");
+        assertEquals(1, originalMessages.size());
     }
 
     @Test

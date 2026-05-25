@@ -14,14 +14,20 @@ public class InMemoryChatMemory implements ChatMemoryStore {
 
     @Override
     public void addMessage(String conversationId, AiMessage message) {
-        store.computeIfAbsent(conversationId, k -> new ArrayList<>()).add(message);
+        store.computeIfAbsent(conversationId, k -> Collections.synchronizedList(new ArrayList<>()))
+                .add(message);
         trimMessages(conversationId);
     }
 
     @Override
     public List<AiMessage> getMessages(String conversationId) {
         List<AiMessage> messages = store.get(conversationId);
-        return messages != null ? Collections.unmodifiableList(messages) : Collections.emptyList();
+        if (messages == null) {
+            return Collections.emptyList();
+        }
+        synchronized (messages) {
+            return new ArrayList<>(messages);
+        }
     }
 
     @Override
@@ -36,9 +42,13 @@ public class InMemoryChatMemory implements ChatMemoryStore {
 
     private void trimMessages(String conversationId) {
         List<AiMessage> messages = store.get(conversationId);
-        if (messages != null && messages.size() > maxMessages) {
-            int removeCount = messages.size() - maxMessages;
-            messages.subList(0, removeCount).clear();
+        if (messages == null) {
+            return;
+        }
+        synchronized (messages) {
+            while (messages.size() > maxMessages) {
+                messages.remove(0);
+            }
         }
     }
 }

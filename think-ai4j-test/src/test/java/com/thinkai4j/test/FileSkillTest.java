@@ -1,7 +1,6 @@
 package com.thinkai4j.test;
 
 import com.thinkai4j.skill.FileSkill;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -62,28 +61,15 @@ class FileSkillTest {
 
         String result = fileSkill.listDirectory(tempDir.toString());
         assertNotNull(result);
-        assertTrue(result.contains("[DIR] folder1") || result.contains("[DIR]folder1"), "Expected DIR folder1 but got: " + result);
-        assertTrue(result.contains("[FILE]file1.txt") || result.contains("[FILE] file1.txt"), "Expected FILE file1.txt but got: " + result);
-        assertTrue(result.contains("[FILE]file2.txt") || result.contains("[FILE] file2.txt"), "Expected FILE file2.txt but got: " + result);
+        assertTrue(result.contains("[DIR] folder1") || result.contains("[DIR]folder1"), "Got: " + result);
+        assertTrue(result.contains("[FILE]file1.txt") || result.contains("[FILE] file1.txt"), "Got: " + result);
+        assertTrue(result.contains("[FILE]file2.txt") || result.contains("[FILE] file2.txt"), "Got: " + result);
     }
 
     @Test
     void testListNonExistentDirectory() {
         String result = fileSkill.listDirectory("nonexistent_dir");
         assertTrue(result.contains("目录不存在"));
-    }
-
-    @Test
-    void testWriteFileWithAbsolutePath() throws IOException {
-        Path absolutePath = tempDir.resolve("absolute.txt");
-        String content = "Absolute path content";
-        
-        String result = fileSkill.writeFile(absolutePath.toString(), content);
-        assertTrue(result.contains("写入成功"));
-        assertTrue(Files.exists(absolutePath));
-
-        String readResult = fileSkill.readFile(absolutePath.toString());
-        assertEquals(content, readResult);
     }
 
     @Test
@@ -110,5 +96,44 @@ class FileSkillTest {
         String result = fileSkill.listDirectory("empty_folder");
         assertNotNull(result);
         assertEquals("", result.trim());
+    }
+
+    @Test
+    void testPathTraversalBlocked() {
+        String result = fileSkill.readFile("../../../etc/passwd");
+        assertTrue(result.contains("安全限制"), "Should block path traversal, got: " + result);
+    }
+
+    @Test
+    void testAbsolutePathBlocked() {
+        String result = fileSkill.readFile("C:\\Windows\\System32\\config\\SAM");
+        assertTrue(result.contains("安全限制"), "Should block absolute path outside sandbox, got: " + result);
+    }
+
+    @Test
+    void testPathTraversalWithDotDot() {
+        String result = fileSkill.readFile("../../secret.txt");
+        assertTrue(result.contains("安全限制"), "Should block ../ traversal, got: " + result);
+    }
+
+    @Test
+    void testSandboxDisabledAllowsAbsolutePath() throws IOException {
+        FileSkill unrestrictedSkill = new FileSkill(tempDir.toString(), false);
+        Path absolutePath = tempDir.resolve("absolute.txt");
+        String content = "Absolute path content";
+
+        String result = unrestrictedSkill.writeFile(absolutePath.toString(), content);
+        assertTrue(result.contains("写入成功"));
+        assertTrue(Files.exists(absolutePath));
+
+        String readResult = unrestrictedSkill.readFile(absolutePath.toString());
+        assertEquals(content, readResult);
+    }
+
+    @Test
+    void testReadDirectoryAsFile() throws IOException {
+        Files.createDirectory(tempDir.resolve("a_directory"));
+        String result = fileSkill.readFile("a_directory");
+        assertTrue(result.contains("目录"), "Should indicate it's a directory, got: " + result);
     }
 }

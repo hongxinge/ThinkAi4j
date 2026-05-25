@@ -2,7 +2,6 @@ package com.thinkai4j.test;
 
 import com.thinkai4j.skill.DatabaseSkill;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -127,5 +126,75 @@ class DatabaseSkillTest {
         String result = databaseSkill.executeQuery("SELECT COUNT(*) FROM users");
         assertNotNull(result);
         assertTrue(result.contains("1 条记录"));
+    }
+
+    @Test
+    void testSqlInjectionDropTable() {
+        String result = databaseSkill.executeQuery("DROP TABLE users");
+        assertNotNull(result);
+        assertTrue(result.contains("安全限制"), "Should block DROP TABLE, got: " + result);
+    }
+
+    @Test
+    void testSqlInjectionDelete() {
+        String result = databaseSkill.executeQuery("DELETE FROM users WHERE 1=1");
+        assertNotNull(result);
+        assertTrue(result.contains("安全限制"), "Should block DELETE, got: " + result);
+    }
+
+    @Test
+    void testSqlInjectionUpdate() {
+        String result = databaseSkill.executeQuery("UPDATE users SET name='hacked'");
+        assertNotNull(result);
+        assertTrue(result.contains("安全限制"), "Should block UPDATE, got: " + result);
+    }
+
+    @Test
+    void testSqlInjectionInsert() {
+        String result = databaseSkill.executeQuery("INSERT INTO users VALUES (99, 'hacker', 0, 'nowhere')");
+        assertNotNull(result);
+        assertTrue(result.contains("安全限制"), "Should block INSERT, got: " + result);
+    }
+
+    @Test
+    void testSqlInjectionSemicolon() {
+        String result = databaseSkill.executeQuery("SELECT 1; DROP TABLE users");
+        assertNotNull(result);
+        assertTrue(result.contains("安全限制"), "Should block semicolon injection, got: " + result);
+    }
+
+    @Test
+    void testSqlInjectionComment() {
+        String result = databaseSkill.executeQuery("SELECT * FROM users -- drop table");
+        assertNotNull(result);
+        assertTrue(result.contains("安全限制"), "Should block SQL comment injection, got: " + result);
+    }
+
+    @Test
+    void testSqlInjectionUnion() {
+        String result = databaseSkill.executeQuery("SELECT * FROM users UNION SELECT * FROM secrets");
+        assertNotNull(result);
+        assertTrue(result.contains("安全限制"), "Should block UNION injection, got: " + result);
+    }
+
+    @Test
+    void testEmptySql() {
+        String result = databaseSkill.executeQuery("");
+        assertNotNull(result);
+        assertTrue(result.contains("不能为空"));
+    }
+
+    @Test
+    void testNullSql() {
+        String result = databaseSkill.executeQuery(null);
+        assertNotNull(result);
+        assertTrue(result.contains("不能为空"));
+    }
+
+    @Test
+    void testInvalidTableName() {
+        String result = databaseSkill.describeTable("users; DROP TABLE users");
+        assertNotNull(result);
+        assertTrue(result.contains("无效") || result.contains("安全"));
     }
 }
