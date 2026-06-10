@@ -51,28 +51,9 @@ ThinkAi4j 采用**通用兼容 + 特殊适配**的设计：
 
 ## 快速开始
 
-### 第 1 步：克隆仓库
+### 方式一：Maven 依赖（推荐，Maven Central 已发布）
 
-```bash
-git clone https://gitee.com/hongxinge/think-ai4j.git
-cd think-ai4j
-```
-
-### 第 2 步：本地安装
-
-> **环境要求**：Java 17+、Maven 3.6.3+
-
-```bash
-# Windows (PowerShell)
-$env:JAVA_HOME="你的JDK路径"
-mvn clean install -DskipTests
-```
-
-安装后，所有模块即可在本地 Maven 仓库中使用。
-
-### 第 3 步：在项目中引入
-
-在你的 Spring Boot 项目 `pom.xml` 中添加：
+只需在你的 Spring Boot 项目 `pom.xml` 中添加：
 
 ```xml
 <!-- Spring Boot Starter（自动装配） -->
@@ -83,9 +64,21 @@ mvn clean install -DskipTests
 </dependency>
 ```
 
-> 框架已内置 Spring Boot Starter，引入后自动生效，无需额外配置。
+> 框架已内置 Spring Boot Starter，引入后自动生效，无需额外配置。Maven 会自动从中央仓库下载，零配置即可使用。
 
-### 第 4 步：配置模型
+### 方式二：克隆源码（适合二次开发/贡献者）
+
+```bash
+git clone https://gitee.com/hongxinge/think-ai4j.git
+# 或 GitHub: https://github.com/hongxinge/ThinkAi4j.git
+cd think-ai4j
+
+# Windows (PowerShell)
+$env:JAVA_HOME="你的JDK路径"
+mvn clean install -DskipTests
+```
+
+### 配置模型
 
 ```yaml
 think:
@@ -125,7 +118,7 @@ think:
 
 > **Ollama 本地模型零配置**：只要本地安装了 Ollama（默认端口 11434），无需任何配置即可使用。
 
-### 第 5 步：开始使用
+### 开始使用
 
 #### 简单对话
 
@@ -364,7 +357,9 @@ think-ai4j/
 └── think-ai4j-test/                    # 测试模块（172个测试用例，全量覆盖）
 ```
 
-## 构建
+## 构建（开发者）
+
+> 普通用户直接使用 Maven 依赖即可，无需克隆源码。以下适合二次开发/贡献者。
 
 > **环境要求**：Java 17+、Maven 3.6.3+、Spring Boot 3.2+
 
