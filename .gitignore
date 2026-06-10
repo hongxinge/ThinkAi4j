@@ -21,3 +21,10 @@ Thumbs.db
 
 # Promotional Materials
 promotional/
+
+# Sensitive Files (never commit)
+maven仓库资料.txt
+本地资料.txt
+private-key.asc
+*.gpg
+settings-merged.xml

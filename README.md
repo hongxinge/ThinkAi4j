@@ -77,9 +77,9 @@ mvn clean install -DskipTests
 ```xml
 <!-- Spring Boot Starter（自动装配） -->
 <dependency>
-    <groupId>com.thinkai4j</groupId>
+    <groupId>com.hongxinge</groupId>
     <artifactId>think-ai4j-spring-boot-starter</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
@@ -361,7 +361,7 @@ think-ai4j/
 ├── think-ai4j-store-pgvector/          # PgVector 向量存储
 ├── think-ai4j-spring-boot-starter/     # Spring Boot 自动配置
 ├── think-ai4j-example/                 # 示例项目
-└── think-ai4j-test/                    # 测试模块（147个测试用例）
+└── think-ai4j-test/                    # 测试模块（172个测试用例，全量覆盖）
 ```
 
 ## 构建

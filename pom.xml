@@ -11,9 +11,9 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.thinkai4j</groupId>
+    <groupId>com.hongxinge</groupId>
     <artifactId>think-ai4j</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>pom</packaging>
 
     <name>ThinkAi4j</name>
@@ -29,9 +29,17 @@
 
     <developers>
         <developer>
-            <name>ThinkAi4j Team</name>
+            <id>hongxinge</id>
+            <name>HongXinGe</name>
+            <email>707969716@qq.com</email>
         </developer>
     </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/hongxinge/ThinkAi4j.git</connection>
+        <developerConnection>scm:git:https://github.com/hongxinge/ThinkAi4j.git</developerConnection>
+        <url>https://github.com/hongxinge/ThinkAi4j</url>
+    </scm>
 
     <modules>
         <module>think-ai4j-core</module>
@@ -61,62 +69,62 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>com.thinkai4j</groupId>
+                <groupId>com.hongxinge</groupId>
                 <artifactId>think-ai4j-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.thinkai4j</groupId>
+                <groupId>com.hongxinge</groupId>
                 <artifactId>think-ai4j-provider-openai-compat</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.thinkai4j</groupId>
+                <groupId>com.hongxinge</groupId>
                 <artifactId>think-ai4j-spring-boot-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.thinkai4j</groupId>
+                <groupId>com.hongxinge</groupId>
                 <artifactId>think-ai4j-memory</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.thinkai4j</groupId>
+                <groupId>com.hongxinge</groupId>
                 <artifactId>think-ai4j-tool</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.thinkai4j</groupId>
+                <groupId>com.hongxinge</groupId>
                 <artifactId>think-ai4j-rag</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.thinkai4j</groupId>
+                <groupId>com.hongxinge</groupId>
                 <artifactId>think-ai4j-agent</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.thinkai4j</groupId>
+                <groupId>com.hongxinge</groupId>
                 <artifactId>think-ai4j-skill</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.thinkai4j</groupId>
+                <groupId>com.hongxinge</groupId>
                 <artifactId>think-ai4j-memory-redis</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.thinkai4j</groupId>
+                <groupId>com.hongxinge</groupId>
                  <artifactId>think-ai4j-observability</artifactId>
                  <version>${project.version}</version>
              </dependency>
              <dependency>
-                 <groupId>com.thinkai4j</groupId>
+                 <groupId>com.hongxinge</groupId>
                  <artifactId>think-ai4j-store-pgvector</artifactId>
                  <version>${project.version}</version>
              </dependency>
              <dependency>
-                 <groupId>com.thinkai4j</groupId>
+                 <groupId>com.hongxinge</groupId>
                  <artifactId>think-ai4j-test</artifactId>
                  <version>${project.version}</version>
                  <scope>test</scope>
@@ -133,6 +141,69 @@
                     <source>${java.version}</source>
                     <target>${java.version}</target>
                     <parameters>true</parameters>
+                </configuration>
+            </plugin>
+
+            <!-- 源码包（Maven Central 要求） -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Javadoc包（Maven Central 要求） -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <doclint>none</doclint>
+                </configuration>
+            </plugin>
+
+            <!-- GPG签名（Maven Central 要求） -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>3.2.4</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <!-- 从 settings.xml 的 thinkai4j-release profile 中读取 -->
+                    <keyname>${gpg.keyname}</keyname>
+                    <passphrase>${gpg.passphrase}</passphrase>
+                </configuration>
+            </plugin>
+
+            <!-- Sonatype Central Publishing（发布到 Maven Central） -->
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.7.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
                 </configuration>
             </plugin>
         </plugins>
