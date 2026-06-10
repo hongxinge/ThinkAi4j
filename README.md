@@ -73,10 +73,23 @@ git clone https://gitee.com/hongxinge/think-ai4j.git
 # 或 GitHub: https://github.com/hongxinge/ThinkAi4j.git
 cd think-ai4j
 
+# 编译并安装到本地 Maven 仓库
 # Windows (PowerShell)
 $env:JAVA_HOME="你的JDK路径"
 mvn clean install -DskipTests
 ```
+
+然后在你的项目 `pom.xml` 中引入依赖（与方式一相同）：
+
+```xml
+<dependency>
+    <groupId>com.hongxinge</groupId>
+    <artifactId>think-ai4j-spring-boot-starter</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+> `mvn clean install` 会将 1.0.0 版本安装到你本地的 Maven 仓库，之后你的项目就可以正常引用了。
 
 ### 配置模型
 
