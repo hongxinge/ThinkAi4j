@@ -99,7 +99,7 @@ public class Agent {
                     String result = executeToolSafely(toolCall);
                     history.add(createToolResultMessage(toolCall, result));
                     
-                    if (longTermMemory != null && toolName.contains("remember") || toolName.contains("save")) {
+                    if (longTermMemory != null && (toolName.contains("remember") || toolName.contains("save"))) {
                         longTermMemory.rememberFact(result);
                     }
                 }

@@ -68,6 +68,16 @@ public class RetryHandler {
                 return true;
             }
         }
+        // Also check the cause chain for retryable exceptions
+        Throwable cause = e.getCause();
+        while (cause != null) {
+            for (Class<? extends Throwable> clazz : retryableExceptions) {
+                if (clazz.isInstance(cause)) {
+                    return true;
+                }
+            }
+            cause = cause.getCause();
+        }
         return false;
     }
 

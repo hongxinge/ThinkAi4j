@@ -12,10 +12,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ToolExecutor {
 
-    private final Map<String, ToolInstance> tools = new HashMap<>();
+    private final Map<String, ToolInstance> tools = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public void register(Object bean, Method method, String description) {

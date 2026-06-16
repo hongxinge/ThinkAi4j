@@ -21,6 +21,7 @@ public class HttpSkill {
     private final Map<String, String> defaultHeaders = new ConcurrentHashMap<>();
     private final Set<String> allowedHosts;
     private final boolean ssrfProtectionEnabled;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
     private static final Set<String> BLOCKED_PRIVATE_RANGES = Set.of(
             "127.", "10.", "0.", "169.254.", "192.168."
     );
@@ -106,8 +107,7 @@ public class HttpSkill {
             defaultHeaders.forEach(builder::header);
 
             if (headersJson != null && !headersJson.isEmpty()) {
-                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                Map<String, String> headers = mapper.readValue(headersJson, Map.class);
+                Map<String, String> headers = objectMapper.readValue(headersJson, Map.class);
                 headers.forEach(builder::header);
             }
 

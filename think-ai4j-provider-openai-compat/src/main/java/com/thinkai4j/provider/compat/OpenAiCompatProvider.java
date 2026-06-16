@@ -8,6 +8,7 @@ import com.thinkai4j.core.model.ToolCall;
 import com.thinkai4j.core.model.ToolDefinition;
 import com.thinkai4j.core.model.Usage;
 import com.thinkai4j.core.exception.AiException;
+import com.thinkai4j.core.retry.RetryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -26,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,7 @@ public class OpenAiCompatProvider implements ChatProvider {
     private final Map<String, String> customHeaders;
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
+    private final RetryHandler retryHandler;
 
     public OpenAiCompatProvider(OpenAiCompatConfig.ModelProvider config, OpenAiCompatConfig.HttpClientConfig httpClientConfig) {
         this.providerName = config.getName();
@@ -66,6 +69,10 @@ public class OpenAiCompatProvider implements ChatProvider {
 
         this.httpClient = clientBuilder.build();
         this.objectMapper = new ObjectMapper();
+        this.retryHandler = RetryHandler.defaults()
+                .maxAttempts(3)
+                .initialDelayMs(1000)
+                .retryOn(IOException.class);
 
         log.info("Initialized OpenAI-compatible provider: {} (baseUrl: {})", providerName, baseUrl);
     }
@@ -77,23 +84,34 @@ public class OpenAiCompatProvider implements ChatProvider {
 
     @Override
     public AiResponse chat(ChatRequest request) {
-        try {
-            String requestBody = buildRequestBody(request, false);
-            Request httpRequest = buildRequest(requestBody);
+        return retryHandler.execute(() -> {
+            try {
+                String requestBody = buildRequestBody(request, false);
+                Request httpRequest = buildRequest(requestBody);
 
-            try (Response response = httpClient.newCall(httpRequest).execute()) {
-                if (!response.isSuccessful()) {
-                    throw new AiException(providerName, "HTTP_" + response.code(),
-                            providerName + " API error: " + response.code() + " " + response.message());
+                try (Response response = httpClient.newCall(httpRequest).execute()) {
+                    if (!response.isSuccessful()) {
+                        String errorBody = response.body() != null ? response.body().string() : "";
+                        // 4xx errors are client errors, not retryable
+                        if (response.code() >= 400 && response.code() < 500) {
+                            throw new AiException(providerName, "HTTP_" + response.code(),
+                                    providerName + " API error: " + response.code() + " " + response.message());
+                        }
+                        // 5xx and other errors are retryable
+                        throw new IOException(providerName + " API error: " + response.code() + " " + response.message()
+                                + (errorBody.isEmpty() ? "" : " - " + errorBody));
+                    }
+                    String responseBody = response.body().string();
+                    return parseResponse(responseBody);
                 }
-                String responseBody = response.body().string();
-                return parseResponse(responseBody);
+            } catch (AiException e) {
+                throw e;
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (Exception e) {
+                throw new AiException(providerName, "REQUEST_ERROR", "Failed to call " + providerName + " API", e);
             }
-        } catch (AiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new AiException(providerName, "REQUEST_ERROR", "Failed to call " + providerName + " API", e);
-        }
+        });
     }
 
     @Override
@@ -107,6 +125,7 @@ public class OpenAiCompatProvider implements ChatProvider {
                     @Override
                     public void onEvent(@NotNull EventSource eventSource, String id, String type, @NotNull String data) {
                         if ("[DONE]".equals(data)) {
+                            eventSource.cancel();
                             sink.complete();
                             return;
                         }
@@ -123,11 +142,13 @@ public class OpenAiCompatProvider implements ChatProvider {
                                 }
                                 JsonNode finishReason = choices.get(0).get("finish_reason");
                                 if (finishReason != null && !finishReason.isNull()) {
+                                    eventSource.cancel();
                                     sink.complete();
                                 }
                             }
                         } catch (Exception e) {
                             log.error("Failed to parse SSE event from provider {}: {}", providerName, e.getMessage());
+                            eventSource.cancel();
                             sink.error(new AiException(providerName, "PARSE_ERROR", "Failed to parse SSE event", e));
                         }
                     }
@@ -138,11 +159,13 @@ public class OpenAiCompatProvider implements ChatProvider {
                                 ? "HTTP " + response.code() + ": " + response.message() 
                                 : t.getMessage();
                         log.error("Stream failed for provider {}: {}", providerName, errorMsg, t);
+                        eventSource.cancel();
                         sink.error(new AiException(providerName, "STREAM_ERROR", "Stream failed: " + errorMsg, t));
                     }
 
                     @Override
                     public void onClosed(@NotNull EventSource eventSource) {
+                        eventSource.cancel();
                         sink.complete();
                     }
                 };
@@ -241,7 +264,7 @@ public class OpenAiCompatProvider implements ChatProvider {
             if (message != null) {
                 JsonNode contentNode = message.get("content");
                 if (contentNode != null && !contentNode.isNull()) {
-                    response.setContent(contentNode.asText());
+                    String contentStr = contentNode.asText(); response.setContent("null".equals(contentStr) ? null : contentStr);
                 }
 
                 if (message.has("tool_calls") && message.get("tool_calls").isArray()) {
