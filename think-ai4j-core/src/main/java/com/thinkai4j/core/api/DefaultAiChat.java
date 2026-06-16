@@ -10,9 +10,11 @@ import com.thinkai4j.core.memory.ChatMemory;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 public class DefaultAiChat implements AiChat {
@@ -24,7 +26,7 @@ public class DefaultAiChat implements AiChat {
 
     private String providerName;
     private String conversationId;
-    private final List<AiMessage> messages = new ArrayList<>();
+    private final List<AiMessage> messages = new CopyOnWriteArrayList<>();
     private Double temperature;
     private Integer maxTokens;
 
@@ -36,7 +38,7 @@ public class DefaultAiChat implements AiChat {
         this.providerRegistry = Objects.requireNonNull(providerRegistry, "providerRegistry cannot be null");
         this.chatMemory = chatMemory;
         this.toolFunctions = new ConcurrentHashMap<>();
-        this.toolDefinitions = new ArrayList<>();
+        this.toolDefinitions = new CopyOnWriteArrayList<>();
     }
 
     @Override

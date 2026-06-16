@@ -1,6 +1,7 @@
 package com.thinkai4j.agent;
 
 import com.thinkai4j.core.api.AiChat;
+import com.thinkai4j.core.exception.AiException;
 import com.thinkai4j.core.model.AiMessage;
 import com.thinkai4j.core.model.AiResponse;
 import com.thinkai4j.core.model.ChatRequest;
@@ -116,7 +117,7 @@ public class Agent {
         }
 
         saveToMemory(history, task);
-        return null;
+        throw new AiException("Agent [" + name + "] exceeded max iterations (" + maxIterations + ") with no final answer");
     }
 
     private List<AiMessage> buildHistory(String task) {
@@ -135,7 +136,7 @@ public class Agent {
             history.addAll(shortTermHistory);
         } else if (conversationId != null && memory != null) {
             List<AiMessage> memMessages = memory.getMessages(conversationId);
-            if (!memMessages.isEmpty()) {
+            if (memMessages != null && !memMessages.isEmpty()) {
                 history.addAll(memMessages);
             }
         }

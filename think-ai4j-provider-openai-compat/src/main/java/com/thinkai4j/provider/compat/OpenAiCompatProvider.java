@@ -264,20 +264,25 @@ public class OpenAiCompatProvider implements ChatProvider {
             if (message != null) {
                 JsonNode contentNode = message.get("content");
                 if (contentNode != null && !contentNode.isNull()) {
-                    String contentStr = contentNode.asText(); response.setContent("null".equals(contentStr) ? null : contentStr);
+                    String contentStr = contentNode.asText();
+                    response.setContent("null".equals(contentStr) ? null : contentStr);
                 }
 
                 if (message.has("tool_calls") && message.get("tool_calls").isArray()) {
                     List<ToolCall> toolCalls = new ArrayList<>();
                     for (JsonNode tc : message.get("tool_calls")) {
                         ToolCall toolCall = new ToolCall();
-                        toolCall.setId(tc.get("id").asText());
-                        toolCall.setType(tc.get("type").asText());
+                        JsonNode idNode = tc.get("id");
+                        toolCall.setId(idNode != null ? idNode.asText() : "");
+                        JsonNode typeNode = tc.get("type");
+                        toolCall.setType(typeNode != null ? typeNode.asText() : "function");
                         ToolCall.FunctionCall function = new ToolCall.FunctionCall();
                         JsonNode funcNode = tc.get("function");
                         if (funcNode != null) {
-                            function.setName(funcNode.get("name").asText());
-                            function.setArguments(funcNode.get("arguments").asText());
+                            JsonNode nameNode = funcNode.get("name");
+                            function.setName(nameNode != null ? nameNode.asText() : "");
+                            JsonNode argsNode = funcNode.get("arguments");
+                            function.setArguments(argsNode != null ? argsNode.asText() : "{}");
                         }
                         toolCall.setFunction(function);
                         toolCalls.add(toolCall);
