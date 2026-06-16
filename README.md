@@ -60,7 +60,7 @@ ThinkAi4j 采用**通用兼容 + 特殊适配**的设计：
 <dependency>
     <groupId>com.hongxinge</groupId>
     <artifactId>think-ai4j-spring-boot-starter</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
@@ -85,11 +85,11 @@ mvn clean install -DskipTests
 <dependency>
     <groupId>com.hongxinge</groupId>
     <artifactId>think-ai4j-spring-boot-starter</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
-> `mvn clean install` 会将 1.0.0 版本安装到你本地的 Maven 仓库，之后你的项目就可以正常引用了。
+> `mvn clean install` 会将 1.0.1 版本安装到你本地的 Maven 仓库，之后你的项目就可以正常引用了。
 
 ### 配置模型
 

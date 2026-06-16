@@ -28,3 +28,4 @@ maven仓库资料.txt
 private-key.asc
 *.gpg
 settings-merged.xml
+AGENTS.md
