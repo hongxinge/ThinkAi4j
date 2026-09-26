@@ -4,6 +4,7 @@ import com.thinkai4j.core.exception.AiException;
 import com.thinkai4j.core.model.AiMessage;
 import com.thinkai4j.core.model.AiResponse;
 import com.thinkai4j.core.model.ChatRequest;
+import com.thinkai4j.core.model.MessageType;
 import com.thinkai4j.core.model.ToolCall;
 import com.thinkai4j.core.model.ToolDefinition;
 import com.thinkai4j.core.memory.ChatMemory;
@@ -53,6 +54,8 @@ public class DefaultAiChat implements AiChat {
     @Override
     public DefaultAiChat system(String content) {
         if (content != null && !content.isBlank()) {
+            // 替换语义：移除已有 system 消息，避免链式多次调用导致堆叠
+            messages.removeIf(m -> m.getRole() == MessageType.SYSTEM);
             messages.add(0, AiMessage.system(content));
         }
         return this;
@@ -104,7 +107,12 @@ public class DefaultAiChat implements AiChat {
         }
         RequestContext ctx = buildRequestContext(question);
         ChatRequest request = buildRequest(ctx, toolDefinitions, true);
-        return getProvider(ctx.providerName).stream(request);
+        // 与 ask() 保持一致：流式对话同样写入记忆
+        saveToMemory(ctx.conversationId, AiMessage.user(ctx.question));
+        StringBuilder contentBuffer = new StringBuilder();
+        return getProvider(ctx.providerName).stream(request)
+                .doOnNext(contentBuffer::append)
+                .doOnComplete(() -> saveToMemory(ctx.conversationId, AiMessage.assistant(contentBuffer.toString())));
     }
 
     @Override
@@ -115,10 +123,9 @@ public class DefaultAiChat implements AiChat {
     @Override
     public AiResponse chat(ChatRequest request) {
         Objects.requireNonNull(request, "request cannot be null");
-        if (request.getModel() == null || request.getModel().isEmpty()) {
-            request.setModel(getProviderName(null));
-        }
-        return getProvider(request.getModel()).chat(request);
+        // provider 字段用于选择 Provider（为空时使用默认 Provider）；
+        // model 字段保持用户设置不变，为空时由 Provider 使用配置的默认模型
+        return getProvider(request.getProvider()).chat(request);
     }
     private String askInternal(RequestContext ctx) {
         int maxIterations = 5;
@@ -205,7 +212,8 @@ public class DefaultAiChat implements AiChat {
         if (tools != null && !tools.isEmpty()) builder.tools(tools);
         ChatRequest request = builder.build();
         request.setStream(stream);
-        request.setModel(getProviderName(ctx.providerName));
+        // 不再写入 model：保持为 null，由 Provider 使用配置的默认模型，
+        // 避免把 provider 名（如 doubao）误当作模型名发送给 API
         return request;
     }
 

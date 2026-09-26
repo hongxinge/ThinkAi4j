@@ -6,6 +6,7 @@ import java.util.List;
 public class ChatRequest {
 
     private String model;
+    private String provider;
     private List<AiMessage> messages;
     private Double temperature;
     private Integer maxTokens;
@@ -23,6 +24,14 @@ public class ChatRequest {
 
     public void setModel(String model) {
         this.model = model;
+    }
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public void setProvider(String provider) {
+        this.provider = provider;
     }
 
     public List<AiMessage> getMessages() {
@@ -82,6 +91,11 @@ public class ChatRequest {
 
         public Builder model(String model) {
             request.setModel(model);
+            return this;
+        }
+
+        public Builder provider(String provider) {
+            request.setProvider(provider);
             return this;
         }
 

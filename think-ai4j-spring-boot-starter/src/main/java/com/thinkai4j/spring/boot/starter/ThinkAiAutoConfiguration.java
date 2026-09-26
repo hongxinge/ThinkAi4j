@@ -13,19 +13,33 @@ import com.thinkai4j.rag.DocumentStore;
 import com.thinkai4j.rag.InMemoryDocumentStore;
 import com.thinkai4j.rag.RagPipeline;
 import com.thinkai4j.agent.Agent;
+import com.thinkai4j.agent.AiAgent;
+import com.thinkai4j.observability.AiMetricsCollector;
+import com.thinkai4j.observability.MetricsAiChatDecorator;
 import com.thinkai4j.tool.annotation.AiTool;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Configuration
 @EnableConfigurationProperties(ThinkAiProperties.class)
@@ -65,12 +79,32 @@ public class ThinkAiAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(AiChat.class)
-    public AiChat aiChat(ChatProviderRegistry registry, Optional<ChatMemory> chatMemory) {
-        return new DefaultAiChat(registry, chatMemory.orElse(null));
+    public AiChat aiChat(ChatProviderRegistry registry, Optional<ChatMemory> chatMemory,
+                         ObjectProvider<AiMetricsCollector> metricsCollectorProvider) {
+        DefaultAiChat chat = new DefaultAiChat(registry, chatMemory.orElse(null));
+        AiMetricsCollector metrics = metricsCollectorProvider.getIfAvailable();
+        // classpath 存在 Micrometer 时自动包装指标采集装饰器
+        return metrics != null ? new MetricsAiChatDecorator(chat, metrics) : chat;
+    }
+
+    /**
+     * 可观测性自动装配：引入 spring-boot-starter-actuator 后，
+     * 自动创建指标采集器并把请求/错误/耗时/Token 指标挂进 AiChat 调用链。
+     */
+    @Configuration
+    @ConditionalOnClass({AiMetricsCollector.class, MeterRegistry.class})
+    @ConditionalOnBean(MeterRegistry.class)
+    static class ObservabilityAutoConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean(AiMetricsCollector.class)
+        public AiMetricsCollector aiMetricsCollector(MeterRegistry meterRegistry) {
+            return new AiMetricsCollector(meterRegistry);
+        }
     }
 
     @Configuration
-    @ConditionalOnClass(RedisChatMemory.class)
+    @ConditionalOnClass(ChatMemory.class)
     @ConditionalOnProperty(prefix = "think.ai.memory", name = "type", havingValue = "redis")
     static class RedisMemoryAutoConfiguration {
 
@@ -136,6 +170,11 @@ public class ThinkAiAutoConfiguration {
         public Agent defaultAgent(AiChat chat) {
             return new Agent("default", "你是一个智能助手，能够使用各种工具完成任务", chat);
         }
+
+        @Bean
+        public static AiAgentRegistrar aiAgentRegistrar() {
+            return new AiAgentRegistrar();
+        }
     }
 
     @Configuration
@@ -145,6 +184,62 @@ public class ThinkAiAutoConfiguration {
         @Bean
         public ToolRegistrar toolRegistrar() {
             return new ToolRegistrar();
+        }
+    }
+
+    /**
+     * 扫描 @AiAgent 注解的 Bean：
+     * 容器启动完成后，为每个注解类创建 Agent（注入 AiChat，
+     * 类内 @AiTool 方法自动注册为工具），并以 "thinkAi4jAgent:名称" 注册为单例。
+     */
+    public static class AiAgentRegistrar implements BeanPostProcessor, BeanFactoryAware, SmartInitializingSingleton {
+
+        private final List<Object> annotatedBeans = new CopyOnWriteArrayList<>();
+        private ConfigurableListableBeanFactory beanFactory;
+
+        @Override
+        public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+            if (beanFactory instanceof ConfigurableListableBeanFactory configurable) {
+                this.beanFactory = configurable;
+            }
+        }
+
+        @Override
+        public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+            if (bean != null && AnnotationUtils.findAnnotation(bean.getClass(), AiAgent.class) != null) {
+                annotatedBeans.add(bean);
+            }
+            return bean;
+        }
+
+        @Override
+        public void afterSingletonsInstantiated() {
+            if (beanFactory == null || annotatedBeans.isEmpty()) {
+                return;
+            }
+            AiChat chat;
+            try {
+                chat = beanFactory.getBean(AiChat.class);
+            } catch (Exception e) {
+                return;
+            }
+            for (Object bean : annotatedBeans) {
+                AiAgent annotation = AnnotationUtils.findAnnotation(bean.getClass(), AiAgent.class);
+                if (annotation == null) {
+                    continue;
+                }
+                String name = annotation.name().isEmpty() ? bean.getClass().getSimpleName() : annotation.name();
+                String systemPrompt = annotation.description().isEmpty()
+                        ? "你是一个智能助手，能够使用各种工具完成任务"
+                        : annotation.description();
+                Agent agent = new Agent(name, systemPrompt, chat);
+                // 注解类中的 @AiTool 方法自动注册为该 Agent 的工具
+                agent.addToolBean(bean);
+                String agentBeanName = "thinkAi4jAgent:" + name;
+                if (!beanFactory.containsSingleton(agentBeanName)) {
+                    beanFactory.registerSingleton(agentBeanName, agent);
+                }
+            }
         }
     }
 

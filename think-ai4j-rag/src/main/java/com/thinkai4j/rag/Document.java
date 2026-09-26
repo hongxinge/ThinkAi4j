@@ -1,11 +1,14 @@
 package com.thinkai4j.rag;
 
+import java.util.List;
+
 public class Document {
 
     private String id;
     private String content;
     private String source;
     private String metadata;
+    private List<Double> embedding;
 
     public Document() {
     }
@@ -50,5 +53,13 @@ public class Document {
 
     public void setMetadata(String metadata) {
         this.metadata = metadata;
+    }
+
+    public List<Double> getEmbedding() {
+        return embedding;
+    }
+
+    public void setEmbedding(List<Double> embedding) {
+        this.embedding = embedding;
     }
 }

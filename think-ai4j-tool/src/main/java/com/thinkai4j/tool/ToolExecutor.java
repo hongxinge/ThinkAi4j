@@ -81,14 +81,20 @@ public class ToolExecutor {
                 if (valueNode == null) {
                     valueNode = argsNode.get("arg" + i);
                 }
-                args[i] = convertValue(valueNode, parameters[i].getType());
+                args[i] = convertValue(valueNode, paramName, parameters[i].getType());
             }
 
             Object result = instance.method.invoke(instance.bean, args);
             return result != null ? result.toString() : "";
 
+        } catch (AiException e) {
+            throw e;
         } catch (Exception e) {
-            throw new AiException("tool", "EXECUTION_ERROR", "Failed to execute tool: " + name, e);
+            // 解包反射调用异常，暴露工具方法抛出的真实异常信息
+            Throwable cause = (e instanceof java.lang.reflect.InvocationTargetException && e.getCause() != null)
+                    ? e.getCause() : e;
+            throw new AiException("tool", "EXECUTION_ERROR",
+                    "Failed to execute tool: " + name + ": " + cause.getMessage(), cause);
         }
     }
 
@@ -103,19 +109,33 @@ public class ToolExecutor {
         if (type == double.class || type == Double.class) return "number";
         if (type == float.class || type == Float.class) return "number";
         if (type == boolean.class || type == Boolean.class) return "boolean";
-        if (type == List.class) return "array";
+        if (type == List.class || type.isArray()) return "array";
+        if (type == Map.class || !type.isPrimitive()) return "object";
         return "string";
     }
 
-    private Object convertValue(JsonNode node, Class<?> type) {
-        if (node == null || node.isNull()) return null;
+    private Object convertValue(JsonNode node, String paramName, Class<?> type) {
+        if (node == null || node.isNull()) {
+            if (type.isPrimitive()) {
+                // 原生类型参数不允许缺失（无法传 null），给出明确错误便于大模型自行修正
+                throw new AiException("tool", "MISSING_PARAMETER",
+                        "Missing required parameter '" + paramName + "' of primitive type " + type.getName());
+            }
+            return null;
+        }
         if (type == String.class) return node.asText();
         if (type == int.class || type == Integer.class) return node.asInt();
         if (type == long.class || type == Long.class) return node.asLong();
         if (type == double.class || type == Double.class) return node.asDouble();
         if (type == float.class || type == Float.class) return (float) node.asDouble();
         if (type == boolean.class || type == Boolean.class) return node.asBoolean();
-        return node.asText();
+        // 复杂类型（POJO/List/Map 等）交由 Jackson 反序列化
+        try {
+            return objectMapper.treeToValue(node, type);
+        } catch (Exception e) {
+            throw new AiException("tool", "PARAM_CONVERT_ERROR",
+                    "Failed to convert parameter '" + paramName + "' to " + type.getName() + ": " + e.getMessage(), e);
+        }
     }
 
     private static class ToolInstance {

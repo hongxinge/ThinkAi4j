@@ -60,7 +60,7 @@ ThinkAi4j 采用**通用兼容 + 特殊适配**的设计：
 <dependency>
     <groupId>com.hongxinge</groupId>
     <artifactId>think-ai4j-spring-boot-starter</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
 </dependency>
 ```
 
@@ -85,11 +85,11 @@ mvn clean install -DskipTests
 <dependency>
     <groupId>com.hongxinge</groupId>
     <artifactId>think-ai4j-spring-boot-starter</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
 </dependency>
 ```
 
-> `mvn clean install` 会将 1.0.1 版本安装到你本地的 Maven 仓库，之后你的项目就可以正常引用了。
+> `mvn clean install` 会将 1.0.2 版本安装到你本地的 Maven 仓库，之后你的项目就可以正常引用了。
 
 ### 配置模型
 
@@ -257,6 +257,68 @@ String results = bus.parallelExecute(Map.of(
 ));
 ```
 
+#### @AiAgent 注解（Spring Boot 自动装配）
+
+Spring Boot 环境下，给任意 Bean 标注 `@AiAgent`，容器启动时自动创建同名 Agent
+（自动注入 `AiChat`，类内 `@AiTool` 方法自动注册为工具）：
+
+```java
+@Component
+@AiAgent(name = "weatherAgent", description = "你是一个专业的天气查询助手")
+public class WeatherAgent {
+
+    @AiTool("查询天气")
+    public String getWeather(@ToolParam(description = "城市名称") String city) {
+        return "晴天，25度";
+    }
+}
+```
+
+启动后通过 `ApplicationContext` 获取自动创建的 Agent：
+
+```java
+@Autowired
+private ApplicationContext context;
+
+Agent agent = (Agent) context.getBean("thinkAi4jAgent:weatherAgent");
+String result = agent.execute("北京天气如何？");
+```
+
+#### 可观测性（Micrometer 指标）
+
+引入 `spring-boot-starter-actuator` 后，框架自动把请求总数、错误数、耗时、
+Token 消耗等指标（`think.ai.requests.total` / `think.ai.errors.total` /
+`think.ai.tokens.total` / `think.ai.request.duration`）挂进 AiChat 调用链，
+无需编写任何代码：
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
+
+配合 Prometheus / Grafana 即可监控所有 AI 调用。
+
+#### PgVector 向量存储（生产级 RAG）
+
+`PgVectorStore` 支持通过 `EmbeddingProvider` 自动生成向量，
+写入与检索均基于真实向量语义匹配：
+
+```java
+// embeddingProvider 为你实现的向量化接口（如接入各厂商 Embedding API）
+PgVectorStore store = new PgVectorStore(jdbcTemplate, "ai_documents", 1024, embeddingProvider);
+
+// 写入文档（自动向量化）
+store.addDocuments(List.of(new Document("公司规定年假为15天")));
+
+// 语义检索（查询文本自动向量化后余弦排序）
+List<Document> hits = store.search("年假有几天", 3);
+```
+
+> 未提供 `EmbeddingProvider` 时，写入时必须由 `Document.setEmbedding()` 预置向量，
+> 语义检索会给出明确错误提示，不会静默产生错误结果。
+
 #### 内置 Skill - 文件操作
 
 ```java
@@ -367,7 +429,7 @@ think-ai4j/
 ├── think-ai4j-store-pgvector/          # PgVector 向量存储
 ├── think-ai4j-spring-boot-starter/     # Spring Boot 自动配置
 ├── think-ai4j-example/                 # 示例项目
-└── think-ai4j-test/                    # 测试模块（172个测试用例，全量覆盖）
+└── think-ai4j-test/                    # 测试模块（157个测试用例，全量覆盖）
 ```
 
 ## 构建（开发者）
@@ -392,6 +454,40 @@ D:\maven\apache-maven-3.9.9\bin\mvn.cmd spring-boot:run
 然后访问：
 - 同步对话：http://localhost:8080/api/chat/ask?q=你好
 - 流式输出：http://localhost:8080/api/chat/stream?q=你好
+
+## 更新日志
+
+### 1.0.2（2026-09-26）
+
+**缺陷修复（企业级健壮性专项）**
+
+- **[重要] 修复配置的模型名被覆盖的问题**：此前 `ask()`/`stream()`/Agent 调用链会把
+  Provider 名称（如 `doubao`）误当作模型名发送给 API，导致真实模型配置不生效。
+  现在 `ChatRequest.provider` 用于选择 Provider，`model` 专用于指定模型名，
+  两者语义彻底分离（未指定 model 时自动使用配置的默认模型）
+- **修复 system() 重复堆叠**：链式多次调用 `system()` 现在是替换语义（仅保留最新一条系统提示词）
+- **修复 PgVector 向量存储**：写入 embedding 不再为空，检索不再按文本反查；
+  接入 `EmbeddingProvider` 实现真实语义检索，并增加向量维度校验与表名安全校验
+- **修复流式对话不落记忆**：`stream()` 与 `ask()` 行为一致，对话自动写入记忆
+- **修复 Redis 记忆并发丢失**：改用 Redis List + Lua 脚本原子追加，
+  高并发场景不再出现消息互相覆盖
+- **修复 AgentBus.parallelExecute 假并行**：改为真实并发执行，全部完成后汇总
+- **修复工具调用复杂类型参数**：`@AiTool` 方法支持 POJO / List / Map 参数自动转换
+- **加固 HTTP Skill SSRF 防护**：在 DNS 解析处校验实际连接 IP，消除 DNS 重绑定绕过窗口，
+  并补全 IPv6 内网地址拦截
+- **修复测试模块包声明错误**导致的 `NoClassDefFoundError`
+- **修复 HttpSkill.allowHost** 传入不可变集合时的 `UnsupportedOperationException`
+
+**新增功能**
+
+- `@AiAgent` 注解：Spring Boot 容器自动扫描并装配 Agent
+- 可观测性自动装配：引入 actuator 即自动采集 AI 调用指标（请求/错误/耗时/Token）
+- `ChatRequest.builder().provider(...)`：Builder 支持指定 Provider
+- `Document` 支持携带 embedding 向量
+
+### 1.0.1
+
+- 首个 Maven Central 发布版本
 
 ## 许可证
 
