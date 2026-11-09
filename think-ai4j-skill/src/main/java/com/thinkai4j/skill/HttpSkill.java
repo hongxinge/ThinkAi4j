@@ -34,7 +34,12 @@ public class HttpSkill {
     public HttpSkill(Set<String> allowedHosts, boolean ssrfProtectionEnabled) {
         this.allowedHosts = allowedHosts != null ? ConcurrentHashMap.newKeySet() : null;
         if (allowedHosts != null) {
-            this.allowedHosts.addAll(allowedHosts);
+            // 白名单统一以小写存储，避免与校验时的小写主机名大小写不一致
+            for (String host : allowedHosts) {
+                if (host != null) {
+                    this.allowedHosts.add(host.toLowerCase());
+                }
+            }
         }
         this.ssrfProtectionEnabled = ssrfProtectionEnabled;
         this.httpClient = new OkHttpClient.Builder()
@@ -219,7 +224,10 @@ public class HttpSkill {
             if (allowedHosts != null && !allowedHosts.isEmpty() && !allowedHosts.contains(lowerHost)) {
                 List<String> matches = new ArrayList<>();
                 for (String allowed : allowedHosts) {
-                    if (lowerHost.endsWith(allowed) || lowerHost.equals(allowed)) {
+                    String lowerAllowed = allowed.toLowerCase();
+                    // 仅允许完全相等或其子域名；旧的 endsWith(allowed) 会让
+                    // evil-example.com 命中 example.com，造成白名单绕过
+                    if (lowerHost.equals(lowerAllowed) || lowerHost.endsWith("." + lowerAllowed)) {
                         matches.add(allowed);
                     }
                 }

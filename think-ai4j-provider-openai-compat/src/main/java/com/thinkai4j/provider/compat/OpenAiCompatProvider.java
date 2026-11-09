@@ -120,6 +120,8 @@ public class OpenAiCompatProvider implements ChatProvider {
             try {
                 String requestBody = buildRequestBody(request, true);
                 Request httpRequest = buildRequest(requestBody);
+                // 持有 EventSource，便于订阅取消时主动关闭 SSE 连接
+                final EventSource[] eventSourceHolder = new EventSource[1];
 
                 EventSourceListener listener = new EventSourceListener() {
                     @Override
@@ -170,7 +172,13 @@ public class OpenAiCompatProvider implements ChatProvider {
                     }
                 };
 
-                EventSources.createFactory(httpClient).newEventSource(httpRequest, listener);
+                eventSourceHolder[0] = EventSources.createFactory(httpClient)
+                        .newEventSource(httpRequest, listener);
+                sink.onCancel(() -> {
+                    if (eventSourceHolder[0] != null) {
+                        eventSourceHolder[0].cancel();
+                    }
+                });
 
             } catch (Exception e) {
                 log.error("Failed to setup stream for provider {}: {}", providerName, e.getMessage(), e);

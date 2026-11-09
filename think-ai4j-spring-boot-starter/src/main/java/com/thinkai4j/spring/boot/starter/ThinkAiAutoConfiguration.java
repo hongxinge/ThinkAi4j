@@ -45,45 +45,45 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @EnableConfigurationProperties(ThinkAiProperties.class)
 public class ThinkAiAutoConfiguration {
 
+    /**
+     * 根据 think.ai.compat.providers 配置构造并注册 OpenAI 兼容 Provider。
+     *
+     * <p>此前由独立配置类经 {@code List<ChatProvider>} Bean 注册，存在三处阻断：
+     * 能力模块 optional 不传递导致配置属性类无法加载、OpenAiCompatConfig 无 Bean 注册点、
+     * 集合注入与 @ConditionalOnProperty 对 YAML 列表的匹配不确定。
+     * 现改为在注册中心创建时一次完成；未配置任何 Provider 时容器仍可正常启动。
+     */
     @Bean
     @ConditionalOnMissingBean
     public ChatProviderRegistry chatProviderRegistry(ThinkAiProperties properties) {
         ChatProviderRegistry registry = new ChatProviderRegistry();
         registry.setDefaultProvider(properties.getDefaultProvider());
-        return registry;
-    }
 
-    @Configuration
-    @ConditionalOnClass(OpenAiCompatProvider.class)
-    @ConditionalOnProperty(prefix = "think.ai.compat", name = "providers")
-    static class OpenAiCompatAutoConfiguration {
-
-        @Bean
-        public List<ChatProvider> openAiCompatProviders(OpenAiCompatConfig config) {
-            return config.getProviders().stream()
-                .<ChatProvider>map(providerConfig -> new OpenAiCompatProvider(providerConfig, config.getHttpClient()))
-                .toList();
+        OpenAiCompatConfig compat = properties.getCompat();
+        if (compat == null || compat.getProviders() == null) {
+            return registry;
         }
-
-        @Bean
-        public ChatProvider openAiCompatRegistrar(List<ChatProvider> providers, ChatProviderRegistry registry) {
-            for (ChatProvider provider : providers) {
-                registry.registerProvider(provider);
-                if (registry.getDefaultProvider() == null) {
-                    registry.setDefaultProvider(provider.getProviderName());
-                }
+        for (OpenAiCompatConfig.ModelProvider config : compat.getProviders()) {
+            ChatProvider provider = new OpenAiCompatProvider(config, compat.getHttpClient());
+            registry.registerProvider(provider);
+            if (registry.getDefaultProvider() == null) {
+                registry.setDefaultProvider(provider.getProviderName());
             }
-            return providers.isEmpty() ? null : providers.get(0);
         }
+        return registry;
     }
 
     @Bean
     @ConditionalOnMissingBean(AiChat.class)
     public AiChat aiChat(ChatProviderRegistry registry, Optional<ChatMemory> chatMemory,
-                         ObjectProvider<AiMetricsCollector> metricsCollectorProvider) {
-        DefaultAiChat chat = new DefaultAiChat(registry, chatMemory.orElse(null));
+                         ObjectProvider<AiMetricsCollector> metricsCollectorProvider,
+                         ThinkAiProperties properties) {
+        boolean memoryEnabled = properties.getMemory() == null
+                || !Boolean.FALSE.equals(properties.getMemory().getEnabled());
+        ChatMemory memory = memoryEnabled ? chatMemory.orElse(null) : null;
+        DefaultAiChat chat = new DefaultAiChat(registry, memory);
         AiMetricsCollector metrics = metricsCollectorProvider.getIfAvailable();
-        // classpath 存在 Micrometer 时自动包装指标采集装饰器
+        // 存在指标采集器（通常由 actuator 的 MeterRegistry 触发）时包装调用链
         return metrics != null ? new MetricsAiChatDecorator(chat, metrics) : chat;
     }
 
@@ -104,7 +104,7 @@ public class ThinkAiAutoConfiguration {
     }
 
     @Configuration
-    @ConditionalOnClass(ChatMemory.class)
+    @ConditionalOnClass({ChatMemory.class, RedisChatMemory.class, StringRedisTemplate.class})
     @ConditionalOnProperty(prefix = "think.ai.memory", name = "type", havingValue = "redis")
     static class RedisMemoryAutoConfiguration {
 
@@ -146,6 +146,7 @@ public class ThinkAiAutoConfiguration {
 
     @Configuration
     @ConditionalOnClass(RagPipeline.class)
+    @ConditionalOnProperty(prefix = "think.ai.rag", name = "enabled", havingValue = "true", matchIfMissing = true)
     static class RagAutoConfiguration {
 
         @Bean
@@ -156,8 +157,10 @@ public class ThinkAiAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean(RagPipeline.class)
-        public RagPipeline ragPipeline(AiChat chat, DocumentStore documentStore) {
-            return new RagPipeline(chat, documentStore);
+        public RagPipeline ragPipeline(AiChat chat, DocumentStore documentStore,
+                                       ThinkAiProperties properties) {
+            Integer topK = properties.getRag() != null ? properties.getRag().getTopK() : null;
+            return new RagPipeline(chat, documentStore, topK != null ? topK : 3);
         }
     }
 

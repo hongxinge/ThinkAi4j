@@ -64,27 +64,28 @@ public class InMemoryDocumentStore implements DocumentStore {
     }
 
     private void rebuildVectors() {
+        // 收集全部文档的词汇；无条件重建，避免新增文档词汇为现有词表子集时
+        // 跳过重建导致其 id 不在 vectorCache 中、search() 永久检索不到
         Set<String> newVocab = new HashSet<>();
         for (Document doc : documents) {
             tokenizer.tokenize(doc.getContent()).forEach(newVocab::add);
         }
 
-        if (!newVocab.equals(vocabulary)) {
-            vocabulary.clear();
-            vocabulary.addAll(newVocab);
-            List<String> sortedVocab = new ArrayList<>(vocabulary);
-            sortedVocab.sort(String::compareTo);
-            vectorSize = sortedVocab.size();
+        vocabulary.clear();
+        vocabulary.addAll(newVocab);
+        List<String> sortedVocab = new ArrayList<>(vocabulary);
+        sortedVocab.sort(String::compareTo);
+        vectorSize = sortedVocab.size();
 
-            vectorCache.clear();
-            Map<String, Integer> wordIndex = new HashMap<>();
-            for (int i = 0; i < sortedVocab.size(); i++) {
-                wordIndex.put(sortedVocab.get(i), i);
-            }
+        Map<String, Integer> wordIndex = new HashMap<>();
+        for (int i = 0; i < sortedVocab.size(); i++) {
+            wordIndex.put(sortedVocab.get(i), i);
+        }
 
-            for (Document doc : documents) {
-                vectorCache.put(doc.getId(), buildVector(doc.getContent(), wordIndex));
-            }
+        // 基于全部文档重新计算向量缓存
+        vectorCache.clear();
+        for (Document doc : documents) {
+            vectorCache.put(doc.getId(), buildVector(doc.getContent(), wordIndex));
         }
     }
 

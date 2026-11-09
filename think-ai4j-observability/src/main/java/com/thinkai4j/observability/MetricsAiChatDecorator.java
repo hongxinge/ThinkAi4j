@@ -85,46 +85,41 @@ public class MetricsAiChatDecorator implements AiChat {
                 .doOnError(e -> metrics.recordRequestError());
     }
 
+    // 被包装的 AiChat 采用不可变链式上下文：fluent 方法返回新实例，
+    // 装饰器必须包装该新实例，否则链式配置会丢失并污染共享单例。
     @Override
     public AiChat system(String content) {
-        delegate.system(content);
-        return this;
+        return new MetricsAiChatDecorator(delegate.system(content), metrics);
     }
 
     @Override
     public AiChat provider(String providerName) {
-        delegate.provider(providerName);
-        return this;
+        return new MetricsAiChatDecorator(delegate.provider(providerName), metrics);
     }
 
     @Override
     public AiChat temperature(double temperature) {
-        delegate.temperature(temperature);
-        return this;
+        return new MetricsAiChatDecorator(delegate.temperature(temperature), metrics);
     }
 
     @Override
     public AiChat maxTokens(int maxTokens) {
-        delegate.maxTokens(maxTokens);
-        return this;
+        return new MetricsAiChatDecorator(delegate.maxTokens(maxTokens), metrics);
     }
 
     @Override
     public AiChat memory(String conversationId) {
-        delegate.memory(conversationId);
-        return this;
+        return new MetricsAiChatDecorator(delegate.memory(conversationId), metrics);
     }
 
     @Override
     public AiChat registerTool(ToolDefinition definition, Function<String, String> executor) {
-        delegate.registerTool(definition, executor);
-        return this;
+        return new MetricsAiChatDecorator(delegate.registerTool(definition, executor), metrics);
     }
 
     @Override
     public AiChat toolDefinitions(List<ToolDefinition> definitions) {
-        delegate.toolDefinitions(definitions);
-        return this;
+        return new MetricsAiChatDecorator(delegate.toolDefinitions(definitions), metrics);
     }
 
     /**

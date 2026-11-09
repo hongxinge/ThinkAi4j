@@ -11,35 +11,50 @@ import com.thinkai4j.core.memory.ChatMemory;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
+/**
+ * AiChat 的默认实现。
+ *
+ * <p>链式配置方法返回携带新上下文快照的实例，不再修改自身状态；因此该对象可作为
+ * Spring 单例安全共享，并发请求之间不会互相覆盖 provider/system/memory 配置。
+ * 工具注册表在同一应用内共享，链式派生出的实例沿用同一引用。
+ */
 public class DefaultAiChat implements AiChat {
+
+    private static final int MAX_TOOL_ITERATIONS = 5;
 
     private final ChatProviderRegistry providerRegistry;
     private final ChatMemory chatMemory;
     private final ConcurrentHashMap<String, Function<String, String>> toolFunctions;
     private final List<ToolDefinition> toolDefinitions;
-
-    private String providerName;
-    private String conversationId;
-    private final List<AiMessage> messages = new CopyOnWriteArrayList<>();
-    private Double temperature;
-    private Integer maxTokens;
+    private final ChatOptions options;
 
     public DefaultAiChat(ChatProviderRegistry providerRegistry) {
         this(providerRegistry, null);
     }
 
     public DefaultAiChat(ChatProviderRegistry providerRegistry, ChatMemory chatMemory) {
+        this(providerRegistry, chatMemory, new ConcurrentHashMap<>(),
+                new CopyOnWriteArrayList<>(), ChatOptions.empty());
+    }
+
+    private DefaultAiChat(ChatProviderRegistry providerRegistry, ChatMemory chatMemory,
+                          ConcurrentHashMap<String, Function<String, String>> toolFunctions,
+                          List<ToolDefinition> toolDefinitions, ChatOptions options) {
         this.providerRegistry = Objects.requireNonNull(providerRegistry, "providerRegistry cannot be null");
         this.chatMemory = chatMemory;
-        this.toolFunctions = new ConcurrentHashMap<>();
-        this.toolDefinitions = new CopyOnWriteArrayList<>();
+        this.toolFunctions = toolFunctions;
+        this.toolDefinitions = toolDefinitions;
+        this.options = options;
+    }
+
+    private DefaultAiChat derive(ChatOptions newOptions) {
+        return new DefaultAiChat(providerRegistry, chatMemory, toolFunctions, toolDefinitions, newOptions);
     }
 
     @Override
@@ -47,42 +62,36 @@ public class DefaultAiChat implements AiChat {
         if (question == null || question.isBlank()) {
             throw new AiException("question cannot be null or blank");
         }
-        RequestContext ctx = buildRequestContext(question);
-        return askInternal(ctx);
+        return askInternal(buildRequestContext(question));
     }
 
     @Override
     public DefaultAiChat system(String content) {
-        if (content != null && !content.isBlank()) {
-            // 替换语义：移除已有 system 消息，避免链式多次调用导致堆叠
-            messages.removeIf(m -> m.getRole() == MessageType.SYSTEM);
-            messages.add(0, AiMessage.system(content));
+        if (content == null || content.isBlank()) {
+            return this;
         }
-        return this;
+        // 替换语义：移除已有系统提示词，仅保留最新一条
+        return derive(options.withSystem(content));
     }
 
     @Override
     public DefaultAiChat provider(String providerName) {
-        this.providerName = providerName;
-        return this;
+        return derive(options.withProvider(providerName));
     }
 
     @Override
     public DefaultAiChat temperature(double temperature) {
-        this.temperature = temperature;
-        return this;
+        return derive(options.withTemperature(temperature));
     }
 
     @Override
     public DefaultAiChat maxTokens(int maxTokens) {
-        this.maxTokens = maxTokens;
-        return this;
+        return derive(options.withMaxTokens(maxTokens));
     }
 
     @Override
     public DefaultAiChat memory(String conversationId) {
-        this.conversationId = conversationId;
-        return this;
+        return derive(options.withConversationId(conversationId));
     }
 
     public DefaultAiChat registerTool(ToolDefinition definition, Function<String, String> executor) {
@@ -106,13 +115,16 @@ public class DefaultAiChat implements AiChat {
             throw new AiException("question cannot be null or blank");
         }
         RequestContext ctx = buildRequestContext(question);
-        ChatRequest request = buildRequest(ctx, toolDefinitions, true);
-        // 与 ask() 保持一致：流式对话同样写入记忆
-        saveToMemory(ctx.conversationId, AiMessage.user(ctx.question));
-        StringBuilder contentBuffer = new StringBuilder();
-        return getProvider(ctx.providerName).stream(request)
-                .doOnNext(contentBuffer::append)
-                .doOnComplete(() -> saveToMemory(ctx.conversationId, AiMessage.assistant(contentBuffer.toString())));
+        ChatRequest request = buildRequest(ctx.history, true);
+        // 每次订阅独立缓冲区；用户消息在订阅时才写入，避免装配期写入造成记忆不完整
+        return Flux.defer(() -> {
+            saveToMemory(ctx.conversationId, AiMessage.user(ctx.question));
+            StringBuilder contentBuffer = new StringBuilder();
+            return getProvider(ctx.providerName).stream(request)
+                    .doOnNext(contentBuffer::append)
+                    .doOnComplete(() -> saveToMemory(ctx.conversationId,
+                            AiMessage.assistant(contentBuffer.toString())));
+        });
     }
 
     @Override
@@ -123,31 +135,25 @@ public class DefaultAiChat implements AiChat {
     @Override
     public AiResponse chat(ChatRequest request) {
         Objects.requireNonNull(request, "request cannot be null");
-        // provider 字段用于选择 Provider（为空时使用默认 Provider）；
-        // model 字段保持用户设置不变，为空时由 Provider 使用配置的默认模型
+        // provider 字段用于选择 Provider，model 字段保持用户设置不变
         return getProvider(request.getProvider()).chat(request);
     }
+
     private String askInternal(RequestContext ctx) {
-        int maxIterations = 5;
         List<AiMessage> history = new ArrayList<>(ctx.history);
-
-        for (int i = 0; i < maxIterations; i++) {
-            ChatRequest request = buildRequest(ctx, toolDefinitions, false);
-            AiResponse response = getProvider(ctx.providerName).chat(request);
-
+        for (int i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+            AiResponse response = getProvider(ctx.providerName).chat(buildRequest(history, false));
             if (hasToolCalls(response) && !toolFunctions.isEmpty()) {
                 history.add(createAssistantMessageWithToolCalls(response.getToolCalls()));
                 executeTools(response, history);
                 continue;
             }
-
             if (response.getContent() != null && !response.getContent().isEmpty()) {
                 saveToMemory(ctx.conversationId, AiMessage.user(ctx.question));
                 saveToMemory(ctx.conversationId, AiMessage.assistant(response.getContent()));
                 return response.getContent();
             }
         }
-
         throw new AiException("Max tool iterations reached without final answer");
     }
 
@@ -156,38 +162,32 @@ public class DefaultAiChat implements AiChat {
             throw new AiException("question cannot be null or blank");
         }
         RequestContext ctx = buildRequestContext(question, conversationId);
-        int maxIterations = 5;
         List<AiMessage> history = new ArrayList<>(ctx.history);
-
-        for (int i = 0; i < maxIterations; i++) {
-            ChatRequest request = buildRequest(ctx, toolDefinitions, false);
-            AiResponse response = getProvider(ctx.providerName).chat(request);
-
+        for (int i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+            AiResponse response = getProvider(ctx.providerName).chat(buildRequest(history, false));
             if (hasToolCalls(response) && !toolFunctions.isEmpty()) {
                 history.add(createAssistantMessageWithToolCalls(response.getToolCalls()));
                 executeTools(response, history);
                 continue;
             }
-
             if (response.getContent() != null && !response.getContent().isEmpty()) {
                 saveToMemory(ctx.conversationId, AiMessage.user(question));
                 saveToMemory(ctx.conversationId, AiMessage.assistant(response.getContent()));
             }
             return response;
         }
-
         throw new AiException("Max tool iterations reached without final answer");
     }
 
     private RequestContext buildRequestContext(String question) {
-        return buildRequestContext(question, this.conversationId);
+        return buildRequestContext(question, options.conversationId);
     }
 
     private RequestContext buildRequestContext(String question, String conversationId) {
         RequestContext ctx = new RequestContext();
         ctx.question = question;
-        ctx.conversationId = conversationId != null ? conversationId : this.conversationId;
-        ctx.providerName = this.providerName;
+        ctx.conversationId = conversationId != null ? conversationId : options.conversationId;
+        ctx.providerName = options.providerName;
         ctx.history = resolveHistory(ctx.conversationId, question);
         return ctx;
     }
@@ -200,20 +200,25 @@ public class DefaultAiChat implements AiChat {
                 history.addAll(stored);
             }
         }
-        history.addAll(new ArrayList<>(messages));
+        history.addAll(options.messages);
         history.add(AiMessage.user(question));
         return history;
     }
 
-    private ChatRequest buildRequest(RequestContext ctx, List<ToolDefinition> tools, boolean stream) {
-        ChatRequest.Builder builder = ChatRequest.builder().messages(new ArrayList<>(ctx.history));
-        if (temperature != null) builder.temperature(temperature);
-        if (maxTokens != null) builder.maxTokens(maxTokens);
-        if (tools != null && !tools.isEmpty()) builder.tools(tools);
+    private ChatRequest buildRequest(List<AiMessage> history, boolean stream) {
+        ChatRequest.Builder builder = ChatRequest.builder().messages(new ArrayList<>(history));
+        if (options.temperature != null) {
+            builder.temperature(options.temperature);
+        }
+        if (options.maxTokens != null) {
+            builder.maxTokens(options.maxTokens);
+        }
+        if (toolDefinitions != null && !toolDefinitions.isEmpty()) {
+            builder.tools(toolDefinitions);
+        }
         ChatRequest request = builder.build();
         request.setStream(stream);
-        // 不再写入 model：保持为 null，由 Provider 使用配置的默认模型，
-        // 避免把 provider 名（如 doubao）误当作模型名发送给 API
+        // 不写入 model：保持为 null，由 Provider 使用配置的默认模型
         return request;
     }
 
@@ -229,7 +234,8 @@ public class DefaultAiChat implements AiChat {
         String name = getProviderName(providerName);
         ChatProvider provider = providerRegistry.getProvider(name);
         if (provider == null) {
-            throw new AiException("Provider not found: " + name + ", available: " + providerRegistry.getAvailableProviders());
+            throw new AiException("Provider not found: " + name
+                    + ", available: " + providerRegistry.getAvailableProviders());
         }
         return provider;
     }
@@ -255,16 +261,66 @@ public class DefaultAiChat implements AiChat {
     }
 
     private AiMessage createAssistantMessageWithToolCalls(List<ToolCall> toolCalls) {
-        AiMessage message = new AiMessage(com.thinkai4j.core.model.MessageType.ASSISTANT, null);
+        AiMessage message = new AiMessage(MessageType.ASSISTANT, null);
         message.setToolCalls(toolCalls);
         return message;
     }
 
     private AiMessage createToolResultMessage(ToolCall toolCall, String result) {
-        AiMessage message = new AiMessage(com.thinkai4j.core.model.MessageType.TOOL, result);
+        AiMessage message = new AiMessage(MessageType.TOOL, result);
         message.setToolCallId(toolCall.getId());
         message.setName(toolCall.getFunction().getName());
         return message;
+    }
+
+    /** 不可变的链式配置快照，每次 fluent 调用生成新实例。 */
+    private static final class ChatOptions {
+
+        private final String providerName;
+        private final String conversationId;
+        private final List<AiMessage> messages;
+        private final Double temperature;
+        private final Integer maxTokens;
+
+        private ChatOptions(String providerName, String conversationId, List<AiMessage> messages,
+                            Double temperature, Integer maxTokens) {
+            this.providerName = providerName;
+            this.conversationId = conversationId;
+            this.messages = List.copyOf(messages);
+            this.temperature = temperature;
+            this.maxTokens = maxTokens;
+        }
+
+        static ChatOptions empty() {
+            return new ChatOptions(null, null, List.of(), null, null);
+        }
+
+        ChatOptions withSystem(String content) {
+            List<AiMessage> next = new ArrayList<>();
+            for (AiMessage message : messages) {
+                if (message.getRole() != MessageType.SYSTEM) {
+                    next.add(message);
+                }
+            }
+            next.add(0, AiMessage.system(content));
+            return new ChatOptions(providerName, conversationId, next, temperature, maxTokens);
+        }
+
+        ChatOptions withProvider(String name) {
+            return new ChatOptions(name, conversationId, messages, temperature, maxTokens);
+        }
+
+        ChatOptions withConversationId(String id) {
+            return new ChatOptions(providerName, id, messages, temperature, maxTokens);
+        }
+
+        ChatOptions withTemperature(double value) {
+            return new ChatOptions(providerName, conversationId, messages, value, maxTokens);
+        }
+
+        ChatOptions withMaxTokens(int value) {
+            return new ChatOptions(providerName, conversationId, messages, temperature, value);
+        }
     }
 
     private static class RequestContext {

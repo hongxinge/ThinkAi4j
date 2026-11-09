@@ -42,37 +42,34 @@ class DefaultAiChatTest {
         assertTrue(result.contains("Mock response"));
     }
 
+    // AiChat 采用不可变链式上下文，fluent 方法返回新实例；
+    // 配置必须与使用处连成一条链，不能再「先改共享实例、再单独调用」。
     @Test
     void testSystem() {
-        chat.system("你是助手");
-        String result = chat.ask("你好");
+        String result = chat.system("你是助手").ask("你好");
         assertNotNull(result);
     }
 
     @Test
     void testProvider() {
-        chat.provider("mock");
-        String result = chat.ask("你好");
+        String result = chat.provider("mock").ask("你好");
         assertNotNull(result);
     }
 
     @Test
     void testProviderNotFound() {
-        chat.provider("nonexistent");
-        assertThrows(AiException.class, () -> chat.ask("你好"));
+        assertThrows(AiException.class, () -> chat.provider("nonexistent").ask("你好"));
     }
 
     @Test
     void testTemperature() {
-        chat.temperature(0.7);
-        String result = chat.ask("你好");
+        String result = chat.temperature(0.7).ask("你好");
         assertNotNull(result);
     }
 
     @Test
     void testMaxTokens() {
-        chat.maxTokens(100);
-        String result = chat.ask("你好");
+        String result = chat.maxTokens(100).ask("你好");
         assertNotNull(result);
     }
 

@@ -12,7 +12,9 @@ public class RetryHandler {
     private java.util.Set<Class<? extends Throwable>> retryableExceptions = new java.util.HashSet<>();
 
     public RetryHandler() {
-        retryableExceptions.add(Exception.class);
+        // 默认只重试 IO 类异常。此前默认加入 Exception.class，使 4xx 抛出的 AiException
+        // 也被无差别重试，与 Provider 中 "4xx errors are not retryable" 的约定冲突。
+        retryableExceptions.add(java.io.IOException.class);
     }
 
     public static RetryHandler defaults() {

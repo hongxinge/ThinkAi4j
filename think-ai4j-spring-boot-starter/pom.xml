@@ -21,40 +21,35 @@
             <groupId>com.hongxinge</groupId>
             <artifactId>think-ai4j-core</artifactId>
         </dependency>
+        <!-- 内部能力模块必须传递给下游：自动配置类与 ThinkAiProperties 直接引用其类型，
+             标记为 optional 会导致仅引入 starter 的项目在启动时抛 NoClassDefFoundError。 -->
         <dependency>
             <groupId>com.hongxinge</groupId>
             <artifactId>think-ai4j-provider-openai-compat</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.hongxinge</groupId>
             <artifactId>think-ai4j-memory</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.hongxinge</groupId>
             <artifactId>think-ai4j-tool</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.hongxinge</groupId>
             <artifactId>think-ai4j-rag</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.hongxinge</groupId>
             <artifactId>think-ai4j-agent</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.hongxinge</groupId>
             <artifactId>think-ai4j-memory-redis</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.hongxinge</groupId>
             <artifactId>think-ai4j-observability</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -64,7 +59,6 @@
         <dependency>
             <groupId>com.hongxinge</groupId>
             <artifactId>think-ai4j-store-pgvector</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -94,6 +88,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- 自动装配冒烟测试：确保「仅引入 starter」时容器可启动且 Provider 已注册 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

@@ -94,12 +94,51 @@ public class FileSkill {
         }
 
         if (sandboxEnabled) {
+            // 词法校验：快速拦截 ../ 穿越与沙箱外的绝对路径
             if (!resolved.startsWith(basePath)) {
+                throw new SecurityException(
+                        "路径超出允许范围: " + path + "（仅允许访问 " + basePath + " 下的文件）");
+            }
+
+            // 真实路径校验：normalize 仅做词法规范化，不解析符号链接/junction，
+            // 沙箱内指向外部的链接会绕过上面的 startsWith 判断，需解析真实落点再比较
+            Path realBase;
+            try {
+                realBase = basePath.toRealPath();
+            } catch (IOException e) {
+                // 沙箱根目录尚不存在时回退到词法路径
+                realBase = basePath;
+            }
+            Path realPath;
+            try {
+                realPath = toRealPathAllowingNonExisting(resolved);
+            } catch (IOException e) {
+                // 无法确认真实落点时按安全优先拒绝访问
+                throw new SecurityException("无法解析路径真实位置，拒绝访问: " + path);
+            }
+            if (!realPath.startsWith(realBase)) {
                 throw new SecurityException(
                         "路径超出允许范围: " + path + "（仅允许访问 " + basePath + " 下的文件）");
             }
         }
 
         return resolved;
+    }
+
+    /**
+     * 解析路径的真实位置（含符号链接/junction）。
+     * 待写入的新文件、乃至其父目录都可能尚不存在，此时向上找到最近真实存在的祖先，
+     * 取其真实路径后拼回剩余片段，从而在路径不存在的前提下仍能校验真实落点。
+     */
+    private Path toRealPathAllowingNonExisting(Path path) throws IOException {
+        Path existing = path;
+        while (existing != null && !Files.exists(existing)) {
+            existing = existing.getParent();
+        }
+        if (existing == null) {
+            return path.normalize();
+        }
+        Path realExisting = existing.toRealPath();
+        return realExisting.resolve(existing.relativize(path)).normalize();
     }
 }

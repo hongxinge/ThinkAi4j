@@ -3,6 +3,8 @@ package com.thinkai4j.memory.redis;
 import com.thinkai4j.core.memory.ChatMemory;
 import com.thinkai4j.core.model.AiMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
@@ -20,6 +22,8 @@ import java.util.List;
 public class RedisChatMemory implements ChatMemory {
 
     private static final String KEY_PREFIX = "thinkai4j:memory:";
+
+    private static final Logger log = LoggerFactory.getLogger(RedisChatMemory.class);
 
     /**
      * 原子追加并裁剪、续期：
@@ -76,7 +80,10 @@ public class RedisChatMemory implements ChatMemory {
                     messages.add(message);
                 }
             } catch (Exception e) {
-                // 单条消息损坏时跳过，不影响其余历史消息读取
+                // 单条消息损坏时跳过，不影响其余历史消息读取；
+                // 仅记录会话标识与异常类型，避免把消息正文写入日志造成敏感信息泄露
+                log.warn("跳过损坏的会话消息: conversationId={}, 异常类型={}",
+                        conversationId, e.getClass().getName());
             }
         }
         return Collections.unmodifiableList(messages);

@@ -66,34 +66,35 @@ public class DatabaseSkill {
             return validationError;
         }
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-
+        try (Statement stmt = connection.createStatement()) {
+            // 在执行查询之前设置结果集上限，确保本次查询生效
             stmt.setMaxRows(100);
+            try (ResultSet rs = stmt.executeQuery(sql)) {
 
-            ResultSetMetaData metaData = rs.getMetaData();
-            int columnCount = metaData.getColumnCount();
+                ResultSetMetaData metaData = rs.getMetaData();
+                int columnCount = metaData.getColumnCount();
 
-            List<Map<String, Object>> results = new ArrayList<>();
-            while (rs.next()) {
-                Map<String, Object> row = new LinkedHashMap<>();
-                for (int i = 1; i <= columnCount; i++) {
-                    row.put(metaData.getColumnLabel(i), rs.getObject(i));
+                List<Map<String, Object>> results = new ArrayList<>();
+                while (rs.next()) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    for (int i = 1; i <= columnCount; i++) {
+                        row.put(metaData.getColumnLabel(i), rs.getObject(i));
+                    }
+                    results.add(row);
                 }
-                results.add(row);
-            }
 
-            if (results.isEmpty()) {
-                return "查询成功，返回0条记录";
-            }
+                if (results.isEmpty()) {
+                    return "查询成功，返回0条记录";
+                }
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("查询成功，返回 ").append(results.size()).append(" 条记录:\n");
-            sb.append(results.subList(0, Math.min(10, results.size())));
-            if (results.size() > 10) {
-                sb.append("\n... 还有 ").append(results.size() - 10).append(" 条记录未显示");
+                StringBuilder sb = new StringBuilder();
+                sb.append("查询成功，返回 ").append(results.size()).append(" 条记录:\n");
+                sb.append(results.subList(0, Math.min(10, results.size())));
+                if (results.size() > 10) {
+                    sb.append("\n... 还有 ").append(results.size() - 10).append(" 条记录未显示");
+                }
+                return sb.toString();
             }
-            return sb.toString();
         } catch (SQLException e) {
             return "SQL执行失败: " + e.getMessage();
         }
@@ -103,13 +104,14 @@ public class DatabaseSkill {
     public String listTables() {
         try {
             DatabaseMetaData metaData = connection.getMetaData();
-            ResultSet tables = metaData.getTables(null, null, "%", new String[]{"TABLE"});
+            try (ResultSet tables = metaData.getTables(null, null, "%", new String[]{"TABLE"})) {
 
-            List<String> tableNames = new ArrayList<>();
-            while (tables.next()) {
-                tableNames.add(tables.getString("TABLE_NAME"));
+                List<String> tableNames = new ArrayList<>();
+                while (tables.next()) {
+                    tableNames.add(tables.getString("TABLE_NAME"));
+                }
+                return "数据库表: " + String.join(", ", tableNames);
             }
-            return "数据库表: " + String.join(", ", tableNames);
         } catch (SQLException e) {
             return "获取表列表失败: " + e.getMessage();
         }
@@ -126,19 +128,20 @@ public class DatabaseSkill {
         }
         try {
             DatabaseMetaData metaData = connection.getMetaData();
-            ResultSet columns = metaData.getColumns(null, null, tableName, null);
+            try (ResultSet columns = metaData.getColumns(null, null, tableName, null)) {
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("表 ").append(tableName).append(" 的结构:\n");
-            while (columns.next()) {
-                sb.append("- ").append(columns.getString("COLUMN_NAME"))
-                        .append(" (").append(columns.getString("TYPE_NAME")).append(")");
-                if (columns.getString("IS_NULLABLE").equals("NO")) {
-                    sb.append(" NOT NULL");
+                StringBuilder sb = new StringBuilder();
+                sb.append("表 ").append(tableName).append(" 的结构:\n");
+                while (columns.next()) {
+                    sb.append("- ").append(columns.getString("COLUMN_NAME"))
+                            .append(" (").append(columns.getString("TYPE_NAME")).append(")");
+                    if (columns.getString("IS_NULLABLE").equals("NO")) {
+                        sb.append(" NOT NULL");
+                    }
+                    sb.append("\n");
                 }
-                sb.append("\n");
+                return sb.toString();
             }
-            return sb.toString();
         } catch (SQLException e) {
             return "获取表结构失败: " + e.getMessage();
         }

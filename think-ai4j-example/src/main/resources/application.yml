@@ -60,7 +60,7 @@ think:
 
         # Ollama 本地部署
         # - name: ollama
-        #   baseUrl: http://localhost:11434
+        #   baseUrl: http://localhost:11434/v1   # Provider 会追加 /chat/completions
         #   model: qwen2.5:7b
 
       # HTTP 客户端配置

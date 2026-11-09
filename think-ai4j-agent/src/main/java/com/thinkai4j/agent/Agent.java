@@ -74,6 +74,9 @@ public class Agent {
      */
     public String execute(String task) {
         List<AiMessage> history = buildHistory(task);
+        // 仅把本轮新增消息写回记忆：history 末尾的 user(task) 及其后追加的消息。
+        // 此前会重复写入 user(task)，并把从记忆加载的历史再次回写。
+        int newMessageStart = Math.max(0, history.size() - 1);
 
         for (int i = 0; i < maxIterations; i++) {
             log.debug("Agent [{}] iteration {}/{}", name, i + 1, maxIterations);
@@ -84,22 +87,22 @@ public class Agent {
                     .build();
 
             AiResponse response = chat.chat(request);
-
-            if (response == null || response.getContent() == null) {
+            if (response == null) {
                 log.warn("Agent [{}] received null response at iteration {}", name, i + 1);
                 break;
             }
 
-            history.add(AiMessage.assistant(response.getContent()));
-
+            // 工具调用响应的 content 通常为 null，必须先处理 tool_calls，不能提前 break；
+            // 且 assistant 消息需携带 tool_calls，才能与后续 tool 结果正确配对。
             if (response.getToolCalls() != null && !response.getToolCalls().isEmpty()) {
+                history.add(createAssistantMessageWithToolCalls(response));
                 for (ToolCall toolCall : response.getToolCalls()) {
                     String toolName = toolCall.getFunction().getName();
                     log.debug("Agent [{}] calling tool: {}", name, toolName);
-                    
+
                     String result = executeToolSafely(toolCall);
                     history.add(createToolResultMessage(toolCall, result));
-                    
+
                     if (longTermMemory != null && (toolName.contains("remember") || toolName.contains("save"))) {
                         longTermMemory.rememberFact(result);
                     }
@@ -107,16 +110,22 @@ public class Agent {
                 continue;
             }
 
+            if (response.getContent() == null) {
+                log.warn("Agent [{}] received empty content at iteration {}", name, i + 1);
+                break;
+            }
+
+            history.add(AiMessage.assistant(response.getContent()));
             if (longTermMemory != null) {
                 longTermMemory.addShortTermMessage(AiMessage.user(task));
                 longTermMemory.addShortTermMessage(AiMessage.assistant(response.getContent()));
             }
 
-            saveToMemory(history, task);
+            saveToMemory(history, newMessageStart);
             return response.getContent();
         }
 
-        saveToMemory(history, task);
+        saveToMemory(history, newMessageStart);
         throw new AiException("Agent [" + name + "] exceeded max iterations (" + maxIterations + ") with no final answer");
     }
 
@@ -167,30 +176,19 @@ public class Agent {
         return message;
     }
 
-    private void saveToMemory(List<AiMessage> history, String task) {
-        if (conversationId != null && memory != null) {
-            int existingMsgCount = getExistingMessageCount(memory, conversationId);
-            int msgStart = findNewMessageStartIndex(history);
-            memory.addMessage(conversationId, AiMessage.user(task));
-            for (int i = msgStart; i < history.size(); i++) {
-                memory.addMessage(conversationId, history.get(i));
-            }
+    private void saveToMemory(List<AiMessage> history, int newMessageStart) {
+        if (conversationId == null || memory == null) {
+            return;
+        }
+        for (int i = newMessageStart; i < history.size(); i++) {
+            memory.addMessage(conversationId, history.get(i));
         }
     }
 
-    private int getExistingMessageCount(ChatMemory mem, String convId) {
-        return mem.getMessages(convId).size();
-    }
-
-    private int findNewMessageStartIndex(List<AiMessage> history) {
-        int idx = 0;
-        for (; idx < history.size(); idx++) {
-            AiMessage msg = history.get(idx);
-            if (msg.getRole() != MessageType.SYSTEM) {
-                break;
-            }
-        }
-        return idx;
+    private AiMessage createAssistantMessageWithToolCalls(AiResponse response) {
+        AiMessage message = new AiMessage(MessageType.ASSISTANT, response.getContent());
+        message.setToolCalls(response.getToolCalls());
+        return message;
     }
 
     public ToolExecutor getToolExecutor() {

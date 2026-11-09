@@ -30,3 +30,6 @@ private-key.asc
 settings-merged.xml
 AGENTS.md
 .gpg-home/
+
+# 本地平台数据与项目记忆目录，不纳入版本控制
+.workbuddy/

@@ -11,7 +11,7 @@
 
 ## 特性
 
-- **开箱即用** - Ollama 本地模型零配置，云模型 1 行配置即可使用
+- **开箱即用** - 配置一行即可接入 Ollama，云模型同样 1 行配置即可使用
 - **多模型支持** - 豆包、通义千问、智谱、百度、腾讯、Kimi、DeepSeek、MiniMax、OpenAI 等所有 OpenAI 兼容模型
 - **自由切换** - 配置或代码中随时切换模型，无需改业务代码
 - **流式输出** - 支持 Flux<String>、SSE 多种流式格式
@@ -64,7 +64,7 @@ ThinkAi4j 采用**通用兼容 + 特殊适配**的设计：
 </dependency>
 ```
 
-> 框架已内置 Spring Boot Starter，引入后自动生效，无需额外配置。Maven 会自动从中央仓库下载，零配置即可使用。
+> 框架已内置 Spring Boot Starter，引入后自动生效，无需额外配置。Maven 会自动从中央仓库下载，零配置即可使用。1.0.2 起内部能力模块（core / provider / memory / tool / skill / rag / agent 等）随 starter 传递，无需额外引入。
 
 ### 方式二：克隆源码（适合二次开发/贡献者）
 
@@ -129,7 +129,18 @@ think:
       max-messages: 20
 ```
 
-> **Ollama 本地模型零配置**：只要本地安装了 Ollama（默认端口 11434），无需任何配置即可使用。
+> **接入 Ollama 本地模型**：框架没有硬编码默认 Provider，需显式配置 `think.ai.compat.providers`，配置一行即可接入 Ollama（本地默认端口 11434）：
+
+```yaml
+think:
+  ai:
+    default-provider: ollama
+    compat:
+      providers:
+        - name: ollama
+          baseUrl: http://localhost:11434/v1
+          model: qwen2.5:7b
+```
 
 ### 开始使用
 
@@ -289,7 +300,7 @@ String result = agent.execute("北京天气如何？");
 引入 `spring-boot-starter-actuator` 后，框架自动把请求总数、错误数、耗时、
 Token 消耗等指标（`think.ai.requests.total` / `think.ai.errors.total` /
 `think.ai.tokens.total` / `think.ai.request.duration`）挂进 AiChat 调用链，
-无需编写任何代码：
+无需编写任何代码（4 个指标名称保持不变）：
 
 ```xml
 <dependency>
@@ -299,6 +310,8 @@ Token 消耗等指标（`think.ai.requests.total` / `think.ai.errors.total` /
 ```
 
 配合 Prometheus / Grafana 即可监控所有 AI 调用。
+
+> 注：`think-ai4j-example` 示例项目默认未引入 actuator，需要指标采集时请按上文自行添加该依赖。
 
 #### PgVector 向量存储（生产级 RAG）
 
@@ -429,7 +442,7 @@ think-ai4j/
 ├── think-ai4j-store-pgvector/          # PgVector 向量存储
 ├── think-ai4j-spring-boot-starter/     # Spring Boot 自动配置
 ├── think-ai4j-example/                 # 示例项目
-└── think-ai4j-test/                    # 测试模块（157个测试用例，全量覆盖）
+└── think-ai4j-test/                    # 测试模块（单元测试集中覆盖 core/memory/tool/skill/rag/agent/provider；starter 另含装配冒烟用例）
 ```
 
 ## 构建（开发者）

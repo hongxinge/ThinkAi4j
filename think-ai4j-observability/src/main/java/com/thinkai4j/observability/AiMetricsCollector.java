@@ -1,6 +1,7 @@
 package com.thinkai4j.observability;
 
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import com.thinkai4j.core.model.Usage;
@@ -27,13 +28,21 @@ public class AiMetricsCollector {
                 .description("Total AI API errors")
                 .register(registry);
 
+        // 与 recordRequestSuccess 中动态注册的同名 meter 保持一致的 tag key 集合
+        // （type + provider），否则 Prometheus 后端会因标签不一致报错
         this.totalTokensCounter = Counter.builder("think.ai.tokens.total")
                 .description("Total tokens consumed")
                 .tag("type", "all")
+                .tag("provider", "unknown")
                 .register(registry);
 
         this.requestDurationTimer = Timer.builder("think.ai.request.duration")
                 .description("AI API request duration")
+                .register(registry);
+
+        // 将进行中请求数注册为 Gauge，使 /actuator/metrics 可暴露该指标
+        Gauge.builder("think.ai.requests.active", activeRequests, AtomicLong::get)
+                .description("当前进行中的 AI API 请求数")
                 .register(registry);
     }
 
@@ -63,9 +72,22 @@ public class AiMetricsCollector {
         }
     }
 
+    /**
+     * 记录一次失败请求（不记录耗时），保留原有调用方的兼容入口。
+     */
     public void recordRequestError() {
+        recordRequestError(null);
+    }
+
+    /**
+     * 记录一次失败请求并记录其耗时；duration 为 null 时等价于旧的无参重载。
+     */
+    public void recordRequestError(Duration duration) {
         activeRequests.decrementAndGet();
         errorCounter.increment();
+        if (duration != null) {
+            requestDurationTimer.record(duration);
+        }
     }
 
     public long getActiveRequests() {
