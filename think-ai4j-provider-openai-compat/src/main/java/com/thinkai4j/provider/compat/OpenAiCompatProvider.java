@@ -122,11 +122,15 @@ public class OpenAiCompatProvider implements ChatProvider {
                 Request httpRequest = buildRequest(requestBody);
                 // 持有 EventSource，便于订阅取消时主动关闭 SSE 连接
                 final EventSource[] eventSourceHolder = new EventSource[1];
+                // 主动 cancel 会被 OkHttp 视为流重置并回调 onFailure；标记正常结束以避免误报
+                final java.util.concurrent.atomic.AtomicBoolean finished =
+                        new java.util.concurrent.atomic.AtomicBoolean(false);
 
                 EventSourceListener listener = new EventSourceListener() {
                     @Override
                     public void onEvent(@NotNull EventSource eventSource, String id, String type, @NotNull String data) {
                         if ("[DONE]".equals(data)) {
+                            finished.set(true);
                             eventSource.cancel();
                             sink.complete();
                             return;
@@ -144,12 +148,14 @@ public class OpenAiCompatProvider implements ChatProvider {
                                 }
                                 JsonNode finishReason = choices.get(0).get("finish_reason");
                                 if (finishReason != null && !finishReason.isNull()) {
+                                    finished.set(true);
                                     eventSource.cancel();
                                     sink.complete();
                                 }
                             }
                         } catch (Exception e) {
                             log.error("Failed to parse SSE event from provider {}: {}", providerName, e.getMessage());
+                            finished.set(true);
                             eventSource.cancel();
                             sink.error(new AiException(providerName, "PARSE_ERROR", "Failed to parse SSE event", e));
                         }
@@ -157,6 +163,11 @@ public class OpenAiCompatProvider implements ChatProvider {
 
                     @Override
                     public void onFailure(@NotNull EventSource eventSource, Throwable t, Response response) {
+                        if (finished.get() || sink.isCancelled()) {
+                            // 正常完成或客户端主动取消导致的 CANCEL 不是失败，避免 ERROR 日志与重复 error 信号
+                            log.debug("SSE stream for provider {} closed after normal completion or cancellation", providerName);
+                            return;
+                        }
                         String errorMsg = (response != null) 
                                 ? "HTTP " + response.code() + ": " + response.message() 
                                 : t.getMessage();
@@ -167,6 +178,7 @@ public class OpenAiCompatProvider implements ChatProvider {
 
                     @Override
                     public void onClosed(@NotNull EventSource eventSource) {
+                        finished.set(true);
                         eventSource.cancel();
                         sink.complete();
                     }

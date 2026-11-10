@@ -263,4 +263,20 @@ public class ThinkAiAutoConfiguration {
             }
         }
     }
+
+    /**
+     * 客户端 API 的结构化错误响应：仅在 Spring Web 环境生效，用户自定义同类处理器时自动让位。
+     */
+    @Configuration
+    @ConditionalOnClass(name = "org.springframework.web.bind.annotation.RestControllerAdvice")
+    @ConditionalOnProperty(prefix = "think.ai.error-handler", name = "enabled",
+            havingValue = "true", matchIfMissing = true)
+    static class ErrorHandlerAutoConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean(AiExceptionHandler.class)
+        public AiExceptionHandler aiExceptionHandler() {
+            return new AiExceptionHandler();
+        }
+    }
 }

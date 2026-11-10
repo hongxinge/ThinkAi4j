@@ -60,7 +60,7 @@ ThinkAi4j 采用**通用兼容 + 特殊适配**的设计：
 <dependency>
     <groupId>com.hongxinge</groupId>
     <artifactId>think-ai4j-spring-boot-starter</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 </dependency>
 ```
 
@@ -85,7 +85,7 @@ mvn clean install -DskipTests
 <dependency>
     <groupId>com.hongxinge</groupId>
     <artifactId>think-ai4j-spring-boot-starter</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 </dependency>
 ```
 
@@ -416,6 +416,23 @@ memorySkill.forget("年龄");
 memorySkill.clearMemory();
 ```
 
+## 统一错误响应（客户端 API）
+
+引入 Spring Web 后，框架自动把 `AiException` 转换为结构化 JSON，无需编写代码：
+
+```json
+{
+  "timestamp": "2026-11-10T10:49:51Z",
+  "status": 400,
+  "error": "AI_BAD_REQUEST",
+  "message": "Provider not found: nonexistent",
+  "provider": null,
+  "path": "/api/chat/provider"
+}
+```
+
+状态码映射：`HTTP_4xx` 与参数校验类异常 → 400；`HTTP_5xx` / `STREAM_ERROR` / `REQUEST_ERROR` / `SETUP_ERROR` → 502；其它 → 500。应用已有自定义 `@ControllerAdvice` 时框架自动让位，也可设置 `think.ai.error-handler.enabled=false` 关闭。
+
 ## API 文档
 
 | 方法 | 说明 | 示例 |
@@ -469,6 +486,22 @@ D:\maven\apache-maven-3.9.9\bin\mvn.cmd spring-boot:run
 - 流式输出：http://localhost:8080/api/chat/stream?q=你好
 
 ## 更新日志
+
+### 1.0.3（2026-11-10）
+
+**缺陷修复**
+
+- **[重要] 修复 starter 装配阻断**：内部能力模块改为随 starter 传递，注册中心直接按配置创建 Provider，仅引入 starter 即可正常启动
+- **修复单例 AiChat 状态串扰**：链式配置改为不可变上下文快照，fluent 方法返回新实例
+- **修复工具调用闭环**：工具结果回传下一轮请求；Agent 在 `content` 为 null 时不再提前中断工具循环
+- **修复流式对话正常结束时误报 ERROR 日志**
+- 修复 4xx 业务异常被无差别重试；修复 RAG 增量灌入检索不到；修复多项 Skill 安全与资源问题
+- 单元测试改为本地 Mock 服务，消除外网依赖与 824 秒耗时
+
+**新增功能**
+
+- 客户端 API 统一结构化错误响应（`AiExceptionHandler`），可通过 `think.ai.error-handler.enabled=false` 关闭
+- `think.ai.rag.enabled` / `think.ai.rag.top-k` / `think.ai.memory.enabled` 配置项正式生效
 
 ### 1.0.2（2026-09-26）
 
